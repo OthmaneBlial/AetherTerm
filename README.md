@@ -52,7 +52,7 @@ The agent reconnects automatically after a temporary server outage with bounded 
 
 ## Intended product
 
-The proposed first release is a self-hosted console for one operator and multiple explicitly enrolled Linux agents. Browser sign-in, per-browser session ownership and device credentials have integration tests. Verified HTTPS/WSS for remote access is still required. The [architecture](docs/ARCHITECTURE.md), [product contract](docs/PRODUCT.md) and [threat model](docs/THREAT_MODEL.md) describe how the current code works and what the release must still prove.
+The proposed first release is a self-hosted console for one operator and multiple explicitly enrolled Linux agents. Browser sign-in, per-browser session ownership and device credentials have integration tests. Verified HTTPS/WSS for remote access is still required. The [architecture](docs/ARCHITECTURE.md), [product contract](docs/PRODUCT.md), [threat model](docs/THREAT_MODEL.md), [security guide](docs/SECURITY.md) and [operations guide](docs/OPERATIONS.md) describe how the current code works and what the release must still prove.
 
 AetherTerm does not speak SSH. Compatibility, security and ease-of-use comparisons with other projects have not been measured yet. The [roadmap](ROADMAP.md) defines the work and evidence required before a release and before a real product demonstration video.
 
