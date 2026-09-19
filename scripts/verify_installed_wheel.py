@@ -69,8 +69,13 @@ async def exercise(port, cookie):
         else:
             raise AssertionError(f"Installed PTY produced no expected output: {output!r}")
         await browser.send(json.dumps({"type": "close_session", "sessionId": session_id}))
-        closed = json.loads(await asyncio.wait_for(browser.recv(), 3))
-        assert closed["type"] == "session_closed", closed
+        for _ in range(40):
+            message = json.loads(await asyncio.wait_for(browser.recv(), 3))
+            if message["type"] == "session_closed" and message["sessionId"] == session_id:
+                break
+            assert message["type"] == "term_data", message
+        else:
+            raise AssertionError("No session_closed from installed server")
 
 
 def main():
