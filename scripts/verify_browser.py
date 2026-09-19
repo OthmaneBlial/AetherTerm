@@ -98,7 +98,8 @@ async def main():
                     await page.locator(".xterm-helper-textarea").focus()
                     await page.keyboard.type("printf 'BROWSER_OK\\n'")
                     await page.keyboard.press("Enter")
-                    await page.get_by_text("BROWSER_OK", exact=True).wait_for(state="attached", timeout=10000)
+                    await page.locator(".xterm-screen").get_by_text("BROWSER_OK", exact=True).first.wait_for(
+                        state="attached", timeout=10000)
                     assert not external_requests, f"Web UI requested external assets: {external_requests}"
                     assert not errors, f"Browser console errors before restart: {errors}"
 
@@ -117,7 +118,8 @@ async def main():
                     await page.locator(".xterm-helper-textarea").focus()
                     await page.keyboard.type("printf 'BROWSER_AFTER_OUTAGE\\n'")
                     await page.keyboard.press("Enter")
-                    await page.get_by_text("BROWSER_AFTER_OUTAGE", exact=True).wait_for(state="attached", timeout=10000)
+                    await page.locator(".xterm-screen").get_by_text("BROWSER_AFTER_OUTAGE", exact=True).first.wait_for(
+                        state="attached", timeout=10000)
                     print(f"Browser outage: detected in {detection_seconds:.2f}s; "
                           f"reconnected in {time.monotonic() - recovery_started:.2f}s")
 
@@ -148,10 +150,12 @@ async def main():
                     await page.locator(".xterm-helper-textarea").focus()
                     await page.keyboard.type("printf 'BROWSER_RETURNED\\n'")
                     await page.keyboard.press("Enter")
-                    await page.get_by_text("BROWSER_RETURNED", exact=True).wait_for(state="attached", timeout=10000)
+                    await page.locator(".xterm-screen").get_by_text("BROWSER_RETURNED", exact=True).first.wait_for(
+                        state="attached", timeout=10000)
                     await page.keyboard.type("printf 'HISTORY_ARROW_OK\\n'")
                     await page.keyboard.press("Enter")
-                    await page.get_by_text("HISTORY_ARROW_OK", exact=True).wait_for(state="attached", timeout=10000)
+                    await page.locator(".xterm-screen").get_by_text("HISTORY_ARROW_OK", exact=True).first.wait_for(
+                        state="attached", timeout=10000)
                     await page.wait_for_function("""() =>
                         (document.querySelector('.xterm-screen').textContent.match(/HISTORY_ARROW_OK/g) || []).length >= 2
                     """, timeout=10000)
@@ -205,10 +209,12 @@ async def main():
                     await page.keyboard.press("Enter")
                     await page.keyboard.type("printf 'Live shell connected\\n'")
                     await page.keyboard.press("Enter")
-                    await page.get_by_text("Live shell connected", exact=True).wait_for(state="attached", timeout=10000)
+                    await page.locator(".xterm-screen").get_by_text("Live shell connected", exact=True).first.wait_for(
+                        state="attached", timeout=10000)
                     await page.keyboard.type("uname -s")
                     await page.keyboard.press("Enter")
-                    await page.get_by_text("Linux", exact=True).wait_for(state="attached", timeout=10000)
+                    await page.locator(".xterm-screen").get_by_text("Linux", exact=True).first.wait_for(
+                        state="attached", timeout=10000)
                     errors.clear()  # Network errors from the deliberate outage are expected.
                     screenshot_dir = os.environ.get("AETHERTERM_SCREENSHOT_DIR")
                     if screenshot_dir:
@@ -236,17 +242,20 @@ async def main():
                     await page.locator(".xterm-helper-textarea").focus()
                     await page.keyboard.type("cat")
                     await page.keyboard.press("Enter")
-                    await page.get_by_text("cat", exact=False).wait_for(state="attached", timeout=10000)
+                    await page.locator(".xterm-screen").get_by_text("cat", exact=False).first.wait_for(
+                        state="attached", timeout=10000)
                     await asyncio.sleep(0.2)
                     await page.get_by_role("button", name="Send Ctrl+C").click()
                     await expect(page.get_by_text("Sent Ctrl+C to the active shell.")).to_be_visible()
                     await page.keyboard.type("printf 'AFTER_CTRL_C\\n'")
                     await page.keyboard.press("Enter")
-                    await page.get_by_text("AFTER_CTRL_C", exact=True).wait_for(state="attached", timeout=10000)
+                    await page.locator(".xterm-screen").get_by_text("AFTER_CTRL_C", exact=True).first.wait_for(
+                        state="attached", timeout=10000)
                     await page.keyboard.type("printf 'Caf\\303\\251 \\346\\274\\242\\345\\255\\227\\n'")
                     await page.keyboard.press("Enter")
                     try:
-                        await page.get_by_text("Café 漢字", exact=True).wait_for(state="attached", timeout=10000)
+                        await page.locator(".xterm-screen").get_by_text("Café 漢字", exact=True).first.wait_for(
+                            state="attached", timeout=10000)
                     except Exception:
                         print("Unicode terminal rows:", repr(await page.locator(".xterm-rows").inner_text()),
                               file=sys.stderr)
