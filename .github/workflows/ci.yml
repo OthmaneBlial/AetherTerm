@@ -58,9 +58,18 @@ jobs:
         run: python -m build --wheel --sdist
       - name: Check source archive contains dependency locks
         run: |
-          for lock in requirements.lock requirements-runtime.lock requirements-freeze.lock; do
-            tar -tzf dist/*.tar.gz | rg -F -q "/$lock"
-          done
+          python - <<'PY'
+          from pathlib import Path
+          import tarfile
+
+          archive, = Path("dist").glob("*.tar.gz")
+          expected = {"requirements.lock", "requirements-runtime.lock", "requirements-freeze.lock"}
+          with tarfile.open(archive, "r:gz") as source:
+              included = {Path(name).name for name in source.getnames()}
+          missing = expected - included
+          if missing:
+              raise SystemExit(f"Source archive is missing: {', '.join(sorted(missing))}")
+          PY
       - name: Check installed wheel outside checkout
         run: |
           python -m venv "$RUNNER_TEMP/aetherterm-wheel"
