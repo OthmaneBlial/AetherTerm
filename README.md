@@ -2,6 +2,12 @@
 
 An early prototype that relays a shell on an agent machine to a browser through a FastAPI WebSocket server. It is **not ready for network deployment**.
 
+![AetherTerm desktop console running a real Linux shell in Chromium](assets/screenshots/desktop.png)
+
+<img src="assets/screenshots/mobile.png" alt="AetherTerm console at 375 px with a live Linux shell" width="300">
+
+These are real browser captures from the [Ubuntu CI run for `dbaf5e9`](https://github.com/OthmaneBlial/AetherTerm/actions/runs/35446357041), with a disposable agent and PTY. The [capture record](docs/SCREENSHOTS.md) identifies their source and limits.
+
 > **Security warning:** operator sign-in and per-device agent credentials are implemented. The documented local run uses plain `ws://`; a TLS option has only been checked locally with a temporary certificate. Keep the server bound to loopback while the [security roadmap](ROADMAP.md) is implemented. Do not use this revision for production administration or expose it to a LAN or the Internet.
 
 ## What exists today
