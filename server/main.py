@@ -9,6 +9,9 @@ from urllib.parse import parse_qs
 from .agents import AgentRegistry, agents_file
 from .auth import COOKIE_NAME, SESSION_SECONDS, OperatorAuth, operator_file
 from .network import transport_allowed
+from .limits import (ConnectionLimiter, SlidingWindowLimiter, MAX_CONNECTED_AGENTS,
+                     MAX_SESSIONS_PER_AGENT, MAX_SESSIONS_PER_BROWSER, MAX_SESSIONS_TOTAL)
+from .protocol import ProtocolError, parse_message
 
 app = FastAPI()
 operator_auth = OperatorAuth(operator_file())
@@ -16,30 +19,9 @@ agent_registry = AgentRegistry(agents_file())
 
 import os
 import time
-from collections import defaultdict
 
-# Rate limiting
-connection_attempts = defaultdict(list)
-MAX_CONNECTIONS_PER_MINUTE = 10
-MAX_CONNECTIONS_PER_HOUR = 50
-
-def is_rate_limited(client_ip: str) -> bool:
-    """Simple rate limiting"""
-    now = time.time()
-    # Clean old entries
-    connection_attempts[client_ip] = [t for t in connection_attempts[client_ip] if now - t < 3600]
-
-    # Check limits
-    recent_minute = [t for t in connection_attempts[client_ip] if now - t < 60]
-    recent_hour = connection_attempts[client_ip]
-
-    if len(recent_minute) >= MAX_CONNECTIONS_PER_MINUTE:
-        return True
-    if len(recent_hour) >= MAX_CONNECTIONS_PER_HOUR:
-        return True
-
-    connection_attempts[client_ip].append(now)
-    return False
+browser_connections = ConnectionLimiter()
+agent_connections = ConnectionLimiter()
 
 def log_security_event(event: str, client_ip: str = "unknown", details: str = ""):
     """Log security events"""
@@ -55,12 +37,22 @@ if os.path.exists(web_dir):
 else:
     print("Web directory not found!")
 
-print("AetherTerm prototype: operator and device credentials are required; remote transport is not ready.")
+print("AetherTerm prototype: operator and device credentials are required.")
 
 devices = {}  # device_id: websocket
 device_credentials = {}  # device_id: credential hash for revocation checks
 sessions = {}  # session_id: {'device_id': str, 'web_ws': WebSocket}
-active_connections = {}  # client_ip: connection_info
+
+async def send_error(websocket: WebSocket, message: str) -> None:
+    await websocket.send_text(json.dumps({"type": "error", "message": message}))
+
+
+def session_capacity(websocket: WebSocket, device_id: str) -> bool:
+    if len(sessions) >= MAX_SESSIONS_TOTAL:
+        return False
+    if sum(session["web_ws"] is websocket for session in sessions.values()) >= MAX_SESSIONS_PER_BROWSER:
+        return False
+    return sum(session["device_id"] == device_id for session in sessions.values()) < MAX_SESSIONS_PER_AGENT
 
 
 def active_device(device_id: str) -> bool:
@@ -155,13 +147,14 @@ async def web_websocket(websocket: WebSocket):
         return
 
     # Security check: Rate limiting
-    if is_rate_limited(client_ip):
+    if not browser_connections.allow(client_ip):
         log_security_event("RATE_LIMITED", client_ip, "Too many connection attempts")
         await websocket.close(code=1008, reason="Rate limit exceeded")
         return
 
     await websocket.accept()
     operator_auth.register_socket(session_key, websocket)
+    message_rate = SlidingWindowLimiter(240, 1, max_keys=1)
     log_security_event("WEB_CONNECTION_ESTABLISHED", client_ip, "Web client connected")
 
     try:
@@ -177,7 +170,14 @@ async def web_websocket(websocket: WebSocket):
             if operator_auth.seconds_remaining(session_key) <= 0:
                 await websocket.close(code=1008, reason="Session expired")
                 break
-            msg = json.loads(data)
+            if not message_rate.allow("browser"):
+                await websocket.close(code=1008, reason="Message rate exceeded")
+                break
+            try:
+                msg = parse_message(data, "browser")
+            except ProtocolError as exc:
+                await send_error(websocket, str(exc))
+                continue
 
             # Log all web client activities for security monitoring
             log_security_event("WEB_MESSAGE", client_ip, f"Type: {msg.get('type', 'unknown')}")
@@ -188,7 +188,10 @@ async def web_websocket(websocket: WebSocket):
             elif msg['type'] == 'start_session':
                 device_id = msg['deviceId']
                 if not active_device(device_id):
-                    await websocket.send_text(json.dumps({"type": "error", "message": "Device not connected"}))
+                    await send_error(websocket, "Device not connected")
+                    continue
+                if not session_capacity(websocket, device_id):
+                    await send_error(websocket, "Session limit reached")
                     continue
                 session_id = str(uuid.uuid4())
                 sessions[session_id] = {'device_id': device_id, 'web_ws': websocket}
@@ -200,7 +203,7 @@ async def web_websocket(websocket: WebSocket):
                 input_b64 = msg['input']
                 if session_id not in sessions or sessions[session_id]['web_ws'] is not websocket or not active_device(sessions[session_id]['device_id']):
                     log_security_event("INVALID_SESSION", client_ip)
-                    await websocket.send_text(json.dumps({"type": "error", "message": "Session unavailable"}))
+                    await send_error(websocket, "Session unavailable")
                     continue
                 device_id = sessions[session_id]['device_id']
                 await devices[device_id].send_text(json.dumps({"type": "term_data", "sessionId": session_id, "data": input_b64}))
@@ -212,7 +215,7 @@ async def web_websocket(websocket: WebSocket):
                     device_id = sessions[session_id]['device_id']
                     await devices[device_id].send_text(json.dumps({"type": "resize", "sessionId": session_id, "cols": cols, "rows": rows}))
                 else:
-                    await websocket.send_text(json.dumps({"type": "error", "message": "Session unavailable"}))
+                    await send_error(websocket, "Session unavailable")
     except Exception as e:
         log_security_event("WEB_ERROR", client_ip, str(e))
         print(f"Web WS error: {e}")
@@ -232,7 +235,7 @@ async def client_websocket(websocket: WebSocket):
         return
 
     # Security check: Rate limiting for client connections too
-    if is_rate_limited(client_ip):
+    if not agent_connections.allow(client_ip):
         log_security_event("CLIENT_RATE_LIMITED", client_ip, "Client connection rate limited")
         await websocket.close(code=1008, reason="Rate limit exceeded")
         return
@@ -241,6 +244,7 @@ async def client_websocket(websocket: WebSocket):
     log_security_event("CLIENT_CONNECTION_ESTABLISHED", client_ip, "Client connected")
     device_id = None
     token_hash = None
+    message_rate = SlidingWindowLimiter(240, 1, max_keys=1)
 
     try:
         while True:
@@ -257,7 +261,14 @@ async def client_websocket(websocket: WebSocket):
             if device_id and not agent_registry.is_active(device_id, token_hash):
                 await websocket.close(code=1008, reason="Device revoked or credential rotated")
                 break
-            msg = json.loads(data)
+            if not message_rate.allow("agent"):
+                await websocket.close(code=1008, reason="Message rate exceeded")
+                break
+            try:
+                msg = parse_message(data, "agent")
+            except ProtocolError as exc:
+                await send_error(websocket, str(exc))
+                continue
 
             if msg['type'] == 'register':
                 if device_id is not None:
@@ -275,6 +286,11 @@ async def client_websocket(websocket: WebSocket):
                     log_security_event("DUPLICATE_DEVICE", client_ip, f"Device: {requested_id}")
                     await websocket.send_text(json.dumps({"type": "error", "message": "Device ID already in use"}))
                     await websocket.close(code=1008, reason="Device ID conflict")
+                    return
+
+                if len(devices) >= MAX_CONNECTED_AGENTS:
+                    await send_error(websocket, "Device limit reached")
+                    await websocket.close(code=1008, reason="Device limit reached")
                     return
 
                 device_id = requested_id

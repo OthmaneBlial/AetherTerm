@@ -215,6 +215,42 @@ class BrowserAuthTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn(new_token, logs)
         self.assertNotIn(second_token, logs)
 
+    async def test_malformed_frames_and_session_quota_do_not_break_other_sockets(self):
+        origin = f"http://127.0.0.1:{self.port}"
+        status, headers = self.request("POST", "/login", "password=a-test-password-only", {"Origin": origin})
+        self.assertEqual(status, 303)
+        cookie = headers["set-cookie"].split(";", 1)[0]
+        browser_uri = f"ws://127.0.0.1:{self.port}/ws"
+        agent_uri = f"ws://127.0.0.1:{self.port}/client"
+        async with websockets.connect(agent_uri) as agent:
+            await agent.send("not json")
+            self.assertEqual(json.loads(await agent.recv())["message"], "Invalid JSON")
+            await agent.send(json.dumps({"type": "register", "deviceId": "test-agent", "token": self.agent_token}))
+            self.assertEqual(json.loads(await agent.recv())["type"], "registered")
+            async with websockets.connect(browser_uri, origin=origin, additional_headers={"Cookie": cookie}) as browser:
+                for invalid in ("not json", json.dumps({"type": []}), json.dumps({"type": "resize"})):
+                    await browser.send(invalid)
+                    self.assertEqual(json.loads(await browser.recv())["type"], "error")
+                sessions = []
+                for _ in range(4):
+                    await browser.send(json.dumps({"type": "start_session", "deviceId": "test-agent"}))
+                    started = json.loads(await browser.recv())
+                    self.assertEqual(started["type"], "session_started")
+                    sessions.append(started["sessionId"])
+                    self.assertEqual(json.loads(await agent.recv())["sessionId"], sessions[-1])
+                await browser.send(json.dumps({"type": "start_session", "deviceId": "test-agent"}))
+                self.assertEqual(json.loads(await browser.recv())["message"], "Session limit reached")
+                await browser.send(json.dumps({"type": "term_input", "sessionId": sessions[0], "input": "@@@"}))
+                self.assertEqual(json.loads(await browser.recv())["message"], "Invalid terminal data")
+                await browser.send(json.dumps({"type": "term_input", "sessionId": sessions[0],
+                                               "input": base64.b64encode(b"works\n").decode()}))
+                self.assertEqual(json.loads(await agent.recv())["sessionId"], sessions[0])
+                await agent.send(json.dumps({"type": "term_data", "sessionId": sessions[0], "data": "bad!"}))
+                self.assertEqual(json.loads(await agent.recv())["message"], "Invalid terminal data")
+                await agent.send(json.dumps({"type": "term_data", "sessionId": sessions[0],
+                                             "data": base64.b64encode(b"still works").decode()}))
+                self.assertEqual(base64.b64decode(json.loads(await browser.recv())["data"]), b"still works")
+
 
 if __name__ == "__main__":
     unittest.main()

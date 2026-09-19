@@ -10,6 +10,8 @@ from pathlib import Path
 import secrets
 import time
 
+from .limits import SlidingWindowLimiter
+
 
 COOKIE_NAME = "aetherterm_session"
 SESSION_SECONDS = 8 * 60 * 60
@@ -51,7 +53,7 @@ class OperatorAuth:
         self.path = path
         self.sessions: dict[str, float] = {}
         self.sockets: dict[str, set] = {}
-        self.login_attempts: dict[str, list[float]] = {}
+        self.login_attempts = SlidingWindowLimiter(5, 300)
         self._record_signature: tuple[int, int] | None = None
 
     def configured(self) -> bool:
@@ -85,14 +87,7 @@ class OperatorAuth:
             return False
 
     def allow_login(self, ip: str) -> bool:
-        now = time.monotonic()
-        attempts = [when for when in self.login_attempts.get(ip, []) if now - when < 300]
-        if len(attempts) >= 5:
-            self.login_attempts[ip] = attempts
-            return False
-        attempts.append(now)
-        self.login_attempts[ip] = attempts
-        return True
+        return self.login_attempts.allow(ip)
 
     def create_session(self) -> str:
         token = secrets.token_urlsafe(32)
