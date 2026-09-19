@@ -88,7 +88,19 @@ async def main():
                     await page.keyboard.press("Enter")
                     await page.get_by_text("BROWSER_OK", exact=True).wait_for(state="attached", timeout=10000)
                     await page.set_viewport_size({"width": 375, "height": 812})
-                    assert await page.evaluate("document.documentElement.scrollWidth <= window.innerWidth"), "Mobile horizontal overflow"
+                    try:
+                        await page.wait_for_function("document.documentElement.scrollWidth <= window.innerWidth",
+                                                     timeout=5000)
+                    except Exception as error:
+                        widths = await page.evaluate("""() => ({
+                          viewport: window.innerWidth,
+                          document: document.documentElement.scrollWidth,
+                          overflowing: [...document.querySelectorAll('*')]
+                            .filter(element => element.getBoundingClientRect().right > window.innerWidth + 1)
+                            .slice(0, 8).map(element => ({tag: element.tagName, className: String(element.className),
+                                                          right: element.getBoundingClientRect().right}))
+                        })""")
+                        raise AssertionError(f"Mobile horizontal overflow: {widths}") from error
                     await expect(page.get_by_role("button", name="Close session")).to_be_visible()
                     await page.get_by_role("button", name="Close session").click()
                     await expect(page.get_by_role("heading", name="Your next shell starts here.")).to_be_visible()
