@@ -122,12 +122,30 @@ async def main():
                     await page.keyboard.press("Enter")
                     await page.keyboard.insert_text("Café 漢字")
                     await page.keyboard.press("Enter")
-                    await page.get_by_text("Café 漢字", exact=False).wait_for(state="attached", timeout=10000)
+                    try:
+                        await page.get_by_text("Café 漢字", exact=False).wait_for(state="attached", timeout=10000)
+                    except Exception:
+                        print("Unicode terminal rows:", repr(await page.locator(".xterm-rows").inner_text()),
+                              file=sys.stderr)
+                        diagnostic_dir = Path(os.environ.get("AETHERTERM_SCREENSHOT_DIR", directory / "screenshots"))
+                        diagnostic_dir.mkdir(parents=True, exist_ok=True)
+                        await page.screenshot(path=str(diagnostic_dir / "unicode-failure.png"), full_page=True)
+                        raise
                     await page.keyboard.press("Control+C")
                     await page.keyboard.type("printf 'AFTER_CTRL_C\\n'")
                     await page.keyboard.press("Enter")
                     await page.get_by_text("AFTER_CTRL_C", exact=True).wait_for(state="attached", timeout=10000)
+                    await page.keyboard.type("clear")
+                    await page.keyboard.press("Enter")
+                    await page.keyboard.type("printf 'AETHERTERM_READY\\n'; uname -s; printf 'SHELL_RESPONDS\\n'")
+                    await page.keyboard.press("Enter")
+                    await page.get_by_text("SHELL_RESPONDS", exact=True).wait_for(state="attached", timeout=10000)
                     errors.clear()  # Network errors from the deliberate outage are expected.
+                    screenshot_dir = os.environ.get("AETHERTERM_SCREENSHOT_DIR")
+                    if screenshot_dir:
+                        screenshots = Path(screenshot_dir)
+                        screenshots.mkdir(parents=True, exist_ok=True)
+                        await page.screenshot(path=str(screenshots / "desktop.png"), full_page=True)
                     await page.set_viewport_size({"width": 375, "height": 812})
                     for _ in range(50):
                         widths = await page.evaluate("""() => ({
@@ -143,6 +161,8 @@ async def main():
                         await asyncio.sleep(0.1)
                     else:
                         raise AssertionError(f"Mobile horizontal overflow: {widths}")
+                    if screenshot_dir:
+                        await page.screenshot(path=str(screenshots / "mobile.png"), full_page=True)
                     await expect(page.get_by_role("button", name="Close session")).to_be_visible()
                     await page.get_by_role("button", name="Close session").click()
                     await expect(page.get_by_role("heading", name="Your next shell starts here.")).to_be_visible()

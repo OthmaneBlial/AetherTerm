@@ -73,3 +73,13 @@ jobs:
           python -m playwright install --with-deps chromium
       - name: Exercise the real browser journey
         run: python scripts/verify_browser.py
+        env:
+          AETHERTERM_SCREENSHOT_DIR: artifacts/screenshots
+      - name: Keep real browser screenshots for review
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: chromium-screenshots
+          path: artifacts/screenshots/*.png
+          if-no-files-found: ignore
+          retention-days: 7
