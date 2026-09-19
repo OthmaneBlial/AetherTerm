@@ -54,7 +54,7 @@ jobs:
           mkdir -p release
           cp dist/*.whl dist/*.tar.gz release/
           cp "artifacts/bin/aetherterm-agent-${GITHUB_REF_NAME#v}-linux-x86_64" release/
-          (cd release && sha256sum * > SHA256SUMS)
+          (cd release && sha256sum ./* > SHA256SUMS)
           sha256sum --check release/SHA256SUMS
 
       - name: Create the GitHub release from the verified tag

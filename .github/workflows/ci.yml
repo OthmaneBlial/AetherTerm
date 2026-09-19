@@ -86,7 +86,7 @@ jobs:
       - name: Hash built Python distributions
         run: |
           cd dist
-          sha256sum *.whl *.tar.gz > SHA256SUMS
+          sha256sum ./*.whl ./*.tar.gz > SHA256SUMS
           sha256sum --check SHA256SUMS
       - name: Keep tested Python distributions
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
