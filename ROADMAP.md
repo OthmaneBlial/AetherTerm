@@ -51,7 +51,7 @@ Une case est cochée seulement après satisfaction de **tous** les critères d'a
 
 - [ ] 0.1 Contrat v1 et modèle de menace — documents rédigés ; revue par une autre personne encore requise.
 - [ ] 0.2 Communication honnête — README et bannières corrigés ; jetons publics encore présents dans le code jusqu'à 1.2.
-- [ ] 0.3 Valeur et comparaison avec retours réels.
+- [ ] 0.3 Valeur et comparaison avec retours réels — sources officielles et protocole de mesure documentés ; essais comparables et 3 à 5 retours consentis absents.
 - [ ] 1.1 Authentification navigateur et droits de session.
 - [ ] 1.2 Enrôlement et révocation d'agents.
 - [ ] 1.3 Transport distant chiffré.
