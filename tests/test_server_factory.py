@@ -1,14 +1,27 @@
 """Multiple app instances must not share shell or authentication state."""
 
 from pathlib import Path
+from contextlib import redirect_stdout
+from io import StringIO
+import json
 import tempfile
 import unittest
 
 from server.auth import initialize_operator
-from server.main import create_app
+from server.main import create_app, log_security_event
 
 
 class ServerFactoryTests(unittest.TestCase):
+    def test_audit_log_redacts_unexpected_detail(self):
+        output = StringIO()
+        with redirect_stdout(output):
+            log_security_event("CLIENT_ERROR", "127.0.0.1", "token=private\nvalue")
+        record = json.loads(output.getvalue())
+        self.assertEqual(record["event"], "CLIENT_ERROR")
+        self.assertEqual(record["clientIp"], "127.0.0.1")
+        self.assertEqual(record["details"], "redacted")
+        self.assertNotIn("private", output.getvalue())
+
     def test_instances_isolate_operator_sessions_and_devices(self):
         with tempfile.TemporaryDirectory(prefix="aetherterm-factory-") as directory:
             root = Path(directory)

@@ -2,6 +2,8 @@ from fastapi import APIRouter, FastAPI, Request, WebSocket
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, RedirectResponse
 import asyncio
+from datetime import datetime, timezone
+import ipaddress
 import json
 from pathlib import Path
 from importlib.resources import files
@@ -20,9 +22,16 @@ from .protocol import ProtocolError, parse_message
 from .state import ServerState
 
 def log_security_event(event: str, client_ip: str = "unknown", details: str = ""):
-    """Log security events"""
-    timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
-    print(f"[SECURITY] {timestamp} - {event} - IP: {client_ip} - {details}")
+    """Write bounded JSON audit events without terminal bytes or credentials."""
+    try:
+        address = str(ipaddress.ip_address(client_ip))
+    except ValueError:
+        address = "unknown"
+    safe_details = details if re.fullmatch(r"[A-Za-z0-9 _.,:-]{0,160}", details) else "redacted"
+    record = {"time": datetime.now(timezone.utc).isoformat(), "event": event, "clientIp": address}
+    if safe_details:
+        record["details"] = safe_details
+    print(json.dumps(record, sort_keys=True), flush=True)
 
 try:
     web_dir = Path(str(files("aetherterm_assets")))
@@ -236,9 +245,6 @@ async def web_websocket(websocket: WebSocket):
                 await send_error(websocket, str(exc))
                 continue
 
-            # Log all web client activities for security monitoring
-            log_security_event("WEB_MESSAGE", client_ip, f"Type: {msg.get('type', 'unknown')}")
-
             if msg['type'] == 'list_devices':
                 device_list = [device_id for device_id in devices if active_device(state, device_id)]
                 device_details = []
@@ -305,8 +311,7 @@ async def web_websocket(websocket: WebSocket):
                     await send_json(device_socket, {"type": "close_session", "sessionId": session_id})
                 await send_json(websocket, {"type": "session_closed", "sessionId": session_id})
     except Exception as e:
-        log_security_event("WEB_ERROR", client_ip, str(e))
-        print(f"Web WS error: {e}")
+        log_security_event("WEB_ERROR", client_ip, type(e).__name__)
     finally:
         operator_auth.unregister_socket(session_key, websocket)
         log_security_event("WEB_CONNECTION_CLOSED", client_ip, "Web client disconnected")
@@ -414,8 +419,7 @@ async def client_websocket(websocket: WebSocket):
                 session_id = msg['sessionId']
                 data_b64 = msg['data']
                 if session_id in sessions and sessions[session_id]['device_id'] == device_id and sessions[session_id]['ready']:
-                    if await send_to_browser(state, session_id, {"type": "term_data", "sessionId": session_id, "data": data_b64}):
-                        log_security_event("TERM_DATA_FORWARDED", client_ip, f"Session: {session_id}")
+                    await send_to_browser(state, session_id, {"type": "term_data", "sessionId": session_id, "data": data_b64})
                 else:
                     log_security_event("INVALID_SESSION_DATA", client_ip, f"Session: {session_id}")
 
@@ -437,8 +441,7 @@ async def client_websocket(websocket: WebSocket):
                 await send_json(websocket, {"type": "heartbeat_ack"})
 
     except Exception as e:
-        log_security_event("CLIENT_ERROR", client_ip, str(e))
-        print(f"Client WS error: {e}")
+        log_security_event("CLIENT_ERROR", client_ip, type(e).__name__)
     finally:
         if device_id and devices.get(device_id) is websocket:
             device_last_seen[device_id] = time.time()
