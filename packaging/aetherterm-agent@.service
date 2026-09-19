@@ -1,0 +1,14 @@
+[Unit]
+Description=AetherTerm loopback agent %i
+
+[Service]
+Type=simple
+ExecStart=%h/.local/share/aetherterm/venv/bin/aetherterm-agent --host 127.0.0.1 --port 8001 --device-id %i --token-file %h/.config/aetherterm/%i.token
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=10s
+KillMode=control-group
+UMask=0077
+
+[Install]
+WantedBy=default.target

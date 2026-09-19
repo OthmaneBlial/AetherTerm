@@ -29,6 +29,8 @@ jobs:
         run: python -m unittest discover -s tests -q
       - name: Check disposable local demo setup and cleanup
         run: python -m scripts.demo_local --check
+      - name: Check Linux user service syntax
+        run: systemd-analyze verify packaging/aetherterm-agent@.service
       - name: Build wheel and source archive
         run: python -m build --wheel --sdist
       - name: Check installed wheel outside checkout

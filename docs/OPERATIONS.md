@@ -38,4 +38,4 @@ The server limits a received WebSocket frame to 64 KiB, terminal data to 16 KiB 
 
 ## Planned service management
 
-A reviewed systemd unit, automatic restart policy and non-root deployment procedure are still required before presenting Linux service operation as supported. Until then, use the [local quickstart](QUICKSTART.md) for a controlled run and stop both processes deliberately with Ctrl+C.
+A same-host non-root [systemd user unit example](SYSTEMD.md) and restart policy are available. Its syntax is checked in Linux CI, but the complete service lifecycle on a separate machine and user account is not yet validated. Until then, use the [local quickstart](QUICKSTART.md) for a controlled run and stop both processes deliberately with Ctrl+C.
