@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=1280, initial-scale=1">
+  <title>AetherTerm social preview source</title>
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    html, body { width: 1280px; height: 640px; margin: 0; overflow: hidden; }
+    body {
+      position: relative;
+      color: #f4f5ed;
+      font-family: Menlo, Monaco, Consolas, monospace;
+      background:
+        radial-gradient(ellipse 610px 470px at 79% 47%, #28534d77, transparent 72%),
+        linear-gradient(138deg, #101b1e 0%, #111c1e 55%, #182627 100%);
+    }
+    body::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      opacity: .24;
+      background-image: linear-gradient(#819a930e 1px, transparent 1px),
+                        linear-gradient(90deg, #819a930e 1px, transparent 1px);
+      background-size: 42px 42px;
+    }
+    .rule { position: absolute; inset: 41px 46px auto; height: 1px; background: #7d999248; }
+    .brand { position: absolute; top: 63px; left: 48px; display: flex; align-items: center; gap: 15px; }
+    .mark { width: 34px; height: 34px; border: 1px solid #a4d5c5; transform: rotate(-9deg); position: relative; }
+    .mark::before, .mark::after { content: ""; position: absolute; bottom: 7px; width: 4px; background: #a4d5c5; }
+    .mark::before { height: 9px; left: 8px; }
+    .mark::after { height: 17px; left: 17px; }
+    .brand span { color: #c7e5da; font-size: 15px; font-weight: 700; letter-spacing: .24em; }
+    .eyebrow { position: absolute; top: 157px; left: 49px; color: #94cdbb; font-size: 12px; letter-spacing: .2em; }
+    h1 { position: absolute; top: 186px; left: 42px; margin: 0; font-size: 85px; line-height: .98; letter-spacing: -.09em; }
+    h1 span { color: #a4d5c5; }
+    .copy { position: absolute; top: 388px; left: 49px; margin: 0; color: #c5d4cf; font-size: 19px; line-height: 1.68; letter-spacing: -.02em; }
+    .status { position: absolute; left: 49px; bottom: 53px; display: flex; align-items: center; gap: 10px;
+              color: #e2b776; font-size: 11px; letter-spacing: .11em; }
+    .status::before { content: ""; width: 7px; height: 7px; border: 1px solid #e2b776; border-radius: 50%; }
+    .frame {
+      position: absolute; left: 533px; top: 104px; width: 694px; height: 434px;
+      padding: 8px; overflow: hidden; border: 1px solid #91b5a97a; background: #172224;
+      box-shadow: 0 25px 70px #0009, 0 0 0 8px #2740394d;
+    }
+    .frame img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: 31% 0%; }
+    .caption { position: absolute; right: 53px; bottom: 53px; color: #b8c7c1; font-size: 10px; letter-spacing: .15em; }
+    .caption strong { color: #b8e2d1; font-weight: 400; }
+    .bottom-rule { position: absolute; bottom: 41px; left: 46px; right: 46px; height: 1px; background: #7d999248; }
+  </style>
+</head>
+<body>
+  <div class="rule"></div>
+  <div class="brand"><i class="mark" aria-hidden="true"></i><span>AETHERTERM</span></div>
+  <div class="eyebrow">SELF-HOSTED BROWSER TERMINAL</div>
+  <h1>Aether<span>Term.</span></h1>
+  <p class="copy">One operator.<br>Explicit Linux agents.<br>Real, isolated shells.</p>
+  <div class="status">EARLY ALPHA · LOOPBACK TESTED</div>
+  <div class="frame"><img src="screenshots/desktop.png" alt="Real Chromium capture of AetherTerm running a Linux PTY"></div>
+  <div class="caption">REAL PRODUCT CAPTURE&nbsp; / &nbsp;<strong>UBUNTU + CHROMIUM</strong></div>
+  <div class="bottom-rule"></div>
+</body>
+</html>
