@@ -61,15 +61,15 @@ Une case est cochée seulement après satisfaction de **tous** les critères d'a
 - [ ] 2.3 Reconnexion et états d'erreur — ancien shell terminé et nouvel agent enregistré après redémarrage réel du serveur ; révocation arrête l'agent, backoff réinitialisé après succès ; parcours navigateur hors ligne/retour et délais mesurés à compléter.
 - [ ] 3.1 Premier démarrage jusqu'au shell — appareils enrôlés hors ligne, description, dernière activité de ce processus, étapes d'enrôlement et récupération d'état vérifiés dans Chrome ; installation Linux propre et 3 à 5 essais observés restent nécessaires.
 - [ ] 3.2 Interface accessible et responsive — vrais boutons, focus et sortie lisible par lecteur d'écran ; débordement horizontal absent à 320, 375, 390, 768 et 1280 px dans Chrome ; interaction tactile réelle et revue clavier complète à faire.
-- [ ] 3.3 Assets Web maîtrisés et identité visuelle — xterm.js 6.0.0 et FitAddon 0.11.0 figés, build local et licences incluses ; favicon et CSP vérifiés avec connexion, PTY et déconnexion dans Chrome ; paquet installable et essai hors ligne depuis ce paquet encore requis.
+- [ ] 3.3 Assets Web maîtrisés et identité visuelle — xterm.js 6.0.0 et FitAddon 0.11.0 figés, build local et licences incluses ; favicon et CSP vérifiés avec connexion, PTY et déconnexion dans Chrome ; wheel installé en venv macOS propre avec assets servis localement et PTY réel ; image et essai hors ligne explicite encore requis.
 - [ ] 4.1 Architecture et configuration testables.
 - [ ] 4.2 Suite de tests utile.
-- [ ] 4.3 Dépendances et maintenance vérifiables.
+- [ ] 4.3 Dépendances et maintenance vérifiables — manifeste Python et dépendances directes figées ; résolution transitive, matrice Python/OS, lint, scans et CI encore requis.
 - [ ] 5.1 Installation et déploiement reproductibles.
 - [ ] 5.2 Documentation architecture, sécurité et opérations.
 - [ ] 5.3 README et captures réelles.
 - [ ] 6.1 CI bloquante.
-- [ ] 6.2 Artefacts téléchargeables/installables.
+- [ ] 6.2 Artefacts téléchargeables/installables — wheel local installé et testé sur macOS 3.13 ; conteneur, binaire Linux, installation Linux et téléchargements publiés encore requis.
 - [ ] 6.3 Contributions et présentation GitHub.
 - [ ] 6.4 Première release vérifiée.
 - [ ] 7.1 Capture du parcours final réel.

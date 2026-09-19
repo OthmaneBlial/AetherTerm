@@ -1,0 +1,1 @@
+"""Bundled AetherTerm browser assets."""

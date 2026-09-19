@@ -4,6 +4,7 @@ from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, Red
 import asyncio
 import json
 from pathlib import Path
+from importlib.resources import files
 import re
 import uuid
 from urllib.parse import parse_qs
@@ -31,7 +32,10 @@ def log_security_event(event: str, client_ip: str = "unknown", details: str = ""
     timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
     print(f"[SECURITY] {timestamp} - {event} - IP: {client_ip} - {details}")
 
-web_dir = os.path.join(os.path.dirname(__file__), "..", "web")
+try:
+    web_dir = Path(str(files("aetherterm_assets")))
+except ModuleNotFoundError:
+    web_dir = Path(__file__).resolve().parents[1] / "web"
 print(f"Web directory path: {web_dir}")
 print(f"Web directory exists: {os.path.exists(web_dir)}")
 if os.path.exists(web_dir):

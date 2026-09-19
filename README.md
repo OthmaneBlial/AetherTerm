@@ -21,9 +21,9 @@ This flow was exercised on macOS with Python 3.13. It is a local prototype run, 
 ```bash
 python3.13 -m venv .venv
 source .venv/bin/activate
-python -m pip install -r server/requirements.txt -r client/requirements.txt
-python -m server.admin init
-python -m server.admin enroll local-agent --output ~/.config/aetherterm/local-agent.token
+python -m pip install .
+aetherterm-admin init
+aetherterm-admin enroll local-agent --output ~/.config/aetherterm/local-agent.token
 ```
 
 The operator setup prompts for a password of at least 12 characters. Keep the generated credential file private. Add `--description "My Linux host"` to `enroll` if you want a label in the console. Enrolled devices stay visible when offline; their “last seen” time is remembered only while this server process runs.
@@ -32,17 +32,17 @@ In a second terminal, start the server:
 
 ```bash
 source .venv/bin/activate
-python -m uvicorn server.main:app --host 127.0.0.1 --port 8001
+aetherterm-server --port 8001
 ```
 
 In a third terminal, run the agent under the OS account whose shell you intend to use:
 
 ```bash
 source .venv/bin/activate
-python client/main.py --host 127.0.0.1 --port 8001 --device-id local-agent --token-file ~/.config/aetherterm/local-agent.token
+aetherterm-agent --host 127.0.0.1 --port 8001 --device-id local-agent --token-file ~/.config/aetherterm/local-agent.token
 ```
 
-Open `http://127.0.0.1:8001/web/` and sign in. Use `python -m server.admin rotate local-agent --output <new-private-file>` to replace a device credential, or `python -m server.admin revoke local-agent` to disable it. These commands change the server registry; restart the agent with the new file after rotation. Do not put credential files in Git or pass their contents through command arguments. The proposed remote TLS topology and its current evidence are in [the deployment guide](docs/DEPLOYMENT.md).
+Open `http://127.0.0.1:8001/web/` and sign in. Use `aetherterm-admin rotate local-agent --output <new-private-file>` to replace a device credential, or `aetherterm-admin revoke local-agent` to disable it. These commands change the server registry; restart the agent with the new file after rotation. Do not put credential files in Git or pass their contents through command arguments. The proposed remote TLS topology and its current evidence are in [the deployment guide](docs/DEPLOYMENT.md).
 
 The terminal UI is bundled locally; no CDN connection is needed. To rebuild it after changing `web/src/`, run `cd web && npm ci && npm run build`. The checked-in `web/assets/` files let the Python quickstart work without Node. xterm.js and its fit addon are MIT licensed; their notices are in `web/licenses/`.
 
@@ -62,6 +62,6 @@ AetherTerm does not speak SSH. Compatibility, security and ease-of-use compariso
 | Browser access | Password login, cookie session, same-origin WebSocket and negative cross-browser integration test. | Full device authorization, expiry/revocation and deployment validation. |
 | Agent identity | Per-device credential-file enrollment, rotation and revocation tested locally. | Remote encrypted transport, Linux installation and operating guidance. |
 | Transport | Remote cleartext refused in code; direct TLS and a local Caddy HTTPS/WSS proxy test with certificate validation passed. | Public certificate, external network and graphical browser validation. |
-| Packaging and automation | Requirements files and local `unittest` integration tests; no CI or release artifacts in this checkout. | Reproducible installs, automated gates and tested downloads. |
+| Packaging and automation | A local wheel installed in a clean macOS Python 3.13 venv served its bundled UI and completed a real authorized PTY round trip; local `unittest` integration tests exist. No CI or published release artifacts are verified. | Linux and other declared environments, automated gates and tested downloads. |
 
 The MIT license is in [LICENSE](LICENSE). Contributions are welcome once the security and test setup are documented; please avoid deploying this revision to a reachable network. The complete sequence is tracked in [ROADMAP.md](ROADMAP.md).

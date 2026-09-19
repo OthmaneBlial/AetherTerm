@@ -1,0 +1,6 @@
+include LICENSE README.md
+include web/package.json web/package-lock.json
+recursive-include web/src *.js *.css
+recursive-include web/assets *
+recursive-include web/licenses *
+include web/index.html web/login.html web/favicon.svg
