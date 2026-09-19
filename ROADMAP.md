@@ -59,7 +59,7 @@ Une case est cochée seulement après satisfaction de **tous** les critères d'a
 - [ ] 2.1 PTY isolés et cycle de vie — deux shells et navigateurs, fermeture explicite, fermeture du navigateur et SIGTERM de l'agent testés localement ; Linux, SIGINT et coupure du serveur encore à valider.
 - [ ] 2.2 Terminal interactif et Unicode exact — xterm.js local, UTF-8 fragmenté, couleurs ANSI, `less`, Ctrl+C et redimensionnement testés avec Chrome et un PTY macOS ; Linux, `vim`, flèches et presse-papiers restent à valider.
 - [ ] 2.3 Reconnexion et états d'erreur — ancien shell terminé et nouvel agent enregistré après redémarrage réel du serveur ; révocation arrête l'agent, backoff réinitialisé après succès ; parcours navigateur hors ligne/retour et délais mesurés à compléter.
-- [ ] 3.1 Premier démarrage jusqu'au shell.
+- [ ] 3.1 Premier démarrage jusqu'au shell — appareils enrôlés hors ligne, description, dernière activité de ce processus, étapes d'enrôlement et récupération d'état vérifiés dans Chrome ; installation Linux propre et 3 à 5 essais observés restent nécessaires.
 - [ ] 3.2 Interface accessible et responsive — vrais boutons, focus et sortie lisible par lecteur d'écran ; débordement horizontal absent à 320, 375, 390, 768 et 1280 px dans Chrome ; interaction tactile réelle et revue clavier complète à faire.
 - [ ] 3.3 Assets Web maîtrisés et identité visuelle — xterm.js 6.0.0 et FitAddon 0.11.0 figés, build local et licences incluses ; favicon, CSP, paquet installable et essai hors ligne encore requis.
 - [ ] 4.1 Architecture et configuration testables.

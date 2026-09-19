@@ -26,7 +26,9 @@ python -m server.admin init
 python -m server.admin enroll local-agent --output ~/.config/aetherterm/local-agent.token
 ```
 
-The operator setup prompts for a password of at least 12 characters. Keep the generated credential file private. In a second terminal, start the server:
+The operator setup prompts for a password of at least 12 characters. Keep the generated credential file private. Add `--description "My Linux host"` to `enroll` if you want a label in the console. Enrolled devices stay visible when offline; their “last seen” time is remembered only while this server process runs.
+
+In a second terminal, start the server:
 
 ```bash
 source .venv/bin/activate

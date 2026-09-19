@@ -4,6 +4,7 @@ import '@xterm/xterm/css/xterm.css'
 import './app.css'
 
 const connectionStatus = document.getElementById('connection-status')
+const reauthLink = document.getElementById('reauth-link')
 const notice = document.getElementById('notice')
 const devicesElement = document.getElementById('devices')
 const tabsElement = document.getElementById('session-tabs')
@@ -59,31 +60,49 @@ function sendTerminalBytes(sessionId, bytes) {
   }
 }
 
-function renderDevices(deviceIds) {
-  const nextKey = JSON.stringify([online, deviceIds])
+function renderDevices(deviceDetails) {
+  const nextKey = JSON.stringify([online, deviceDetails.map(device => [device.deviceId, device.description,
+    device.connected, device.connected ? null : device.lastSeen])])
   if (deviceRenderKey === nextKey) return
   deviceRenderKey = nextKey
   devicesElement.replaceChildren()
-  if (!deviceIds.length) {
-    const empty = document.createElement('p')
+  if (!deviceDetails.length) {
+    const empty = document.createElement('div')
     empty.className = 'device-empty'
-    empty.textContent = online ? 'No agent is connected. Enroll and start one to continue.' : 'Waiting for the server connection.'
+    empty.innerHTML = online
+      ? '<span class="onboard-step">01 / SERVER</span><p>Enroll an agent:</p><code>python -m server.admin enroll my-agent --output ~/.config/aetherterm/my-agent.token</code><span class="onboard-step">02 / AGENT</span><p>Start the agent with that private file. The README has the full command.</p>'
+      : '<p>Waiting for the server connection.</p>'
     devicesElement.append(empty)
+    if (online) setNotice('No device is enrolled yet. Enroll one on the server, then start its agent.')
     return
   }
-  for (const deviceId of deviceIds) {
+  for (const device of deviceDetails) {
+    const deviceId = device.deviceId
     const button = document.createElement('button')
     button.type = 'button'
-    button.className = 'device-button'
-    button.innerHTML = '<span class="device-icon" aria-hidden="true">⌁</span><span class="device-copy"><strong></strong><small>ONLINE · OPEN SHELL</small></span><span class="device-arrow" aria-hidden="true">↗</span>'
+    button.className = `device-button${device.connected ? '' : ' offline'}`
+    button.disabled = !device.connected
+    button.innerHTML = '<span class="device-icon" aria-hidden="true">⌁</span><span class="device-copy"><strong></strong><small></small><span class="device-description"></span><span class="device-activity"></span></span><span class="device-arrow" aria-hidden="true">↗</span>'
     button.querySelector('strong').textContent = deviceId
+    button.querySelector('small').textContent = device.connected ? 'ONLINE · OPEN SHELL' : 'OFFLINE · ENROLLED'
+    const description = button.querySelector('.device-description')
+    description.textContent = device.description || ''
+    const activity = button.querySelector('.device-activity')
+    activity.textContent = device.connected ? 'Active now' : (device.lastSeen
+      ? `Last seen ${new Date(device.lastSeen * 1000).toLocaleString()}` : 'Not seen since server start')
+    button.setAttribute('aria-label', `${deviceId}, ${device.connected ? 'online, open shell' : 'offline'}, ${description.textContent} ${activity.textContent}`)
     button.addEventListener('click', () => {
-      if (pendingDevice || !online) return
+      if (pendingDevice || !online || !device.connected) return
       pendingDevice = deviceId
       if (!send({ type: 'start_session', deviceId })) pendingDevice = null
       else setNotice(`Opening a shell on ${deviceId}…`)
     })
     devicesElement.append(button)
+  }
+  if (online && !deviceDetails.some(device => device.connected)) {
+    setNotice('All enrolled devices are offline. Start an agent to open a shell.')
+  } else if (online && !sessions.size && !pendingDevice) {
+    setNotice('Choose a connected device to open a shell.', 'success')
   }
 }
 
@@ -166,7 +185,8 @@ function handleMessage(event) {
   let message
   try { message = JSON.parse(event.data) } catch { return }
   if (message.type === 'device_list') {
-    renderDevices(message.devices)
+    renderDevices(message.deviceDetails || message.devices.map(deviceId =>
+      ({ deviceId, description: '', connected: true, lastSeen: null })))
   } else if (message.type === 'session_started') {
     const deviceId = message.deviceId || pendingDevice || 'Agent'
     pendingDevice = null
@@ -201,6 +221,7 @@ function connect() {
   setConnection('Connecting', 'connecting')
   socket.addEventListener('open', () => {
     online = true
+    reauthLink.hidden = true
     reconnectDelay = 1000
     setConnection('Server connected', 'online')
     setNotice('Choose a connected device to open a shell.', 'success')
@@ -215,6 +236,7 @@ function connect() {
     setConnection('Server offline', 'offline')
     if (event.code === 1008) {
       setNotice('Access expired or was revoked. Sign in again.', 'error')
+      reauthLink.hidden = false
       return
     }
     setNotice('Connection lost. Retrying; previous shells are closed.', 'error')

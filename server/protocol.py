@@ -62,7 +62,7 @@ def parse_message(raw: str, peer: str) -> dict:
     if kind == "register":
         _string(message.get("token"), "credential", 256)
         description = message.get("description", "")
-        if not isinstance(description, str) or len(description) > 120:
+        if not isinstance(description, str) or len(description) > 120 or any(ord(char) < 32 for char in description):
             raise ProtocolError("Invalid description")
     if kind in ("term_input", "term_data", "resize", "close_session", "session_ready", "session_exit"):
         _session_id(message.get("sessionId"))

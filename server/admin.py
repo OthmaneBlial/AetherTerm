@@ -16,6 +16,7 @@ def main() -> None:
         command = subcommands.add_parser(name, help=f"{name.capitalize()} a device credential")
         command.add_argument("device_id")
         command.add_argument("--output", required=True, help="New private token-file path; must not exist")
+        command.add_argument("--description", help="Optional operator-visible device description")
     revoke = subcommands.add_parser("revoke", help="Permanently revoke a device ID")
     revoke.add_argument("device_id")
     args = parser.parse_args()
@@ -33,7 +34,8 @@ def main() -> None:
         print(f"Operator initialized in {operator_file()}")
     elif args.command in ("enroll", "rotate"):
         try:
-            issue_credential(agents_file(), args.device_id, Path(args.output).expanduser(), rotate=args.command == "rotate")
+            issue_credential(agents_file(), args.device_id, Path(args.output).expanduser(),
+                             rotate=args.command == "rotate", description=args.description)
         except (FileExistsError, ValueError) as exc:
             parser.error(str(exc))
         print(f"Credential file created for {args.device_id}. Keep it private and transfer it securely to the agent.")

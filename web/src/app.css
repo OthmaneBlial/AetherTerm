@@ -50,6 +50,8 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .connection-status[data-state="offline"]::before { background: #db8a83; box-shadow: 0 0 0 3px #db8a8322; }
 .text-button { border: 0; background: none; color: var(--muted); font-size: 12px; cursor: pointer; padding: 10px 0; }
 .text-button:hover { color: var(--text); }
+.reauth-link { text-decoration: none; color: var(--amber); }
+.reauth-link[hidden] { display: none; }
 
 .workspace { width: min(1600px, 100%); margin: 0 auto; flex: 1; display: grid; grid-template-columns: 304px minmax(0, 1fr); }
 .sidebar { border-right: 1px solid var(--line); padding: 40px 22px 24px; display: flex; flex-direction: column; min-height: calc(100vh - 74px); background: linear-gradient(150deg, #172326 0%, #121d1f 72%); }
@@ -62,12 +64,22 @@ h1, h2, p { margin-top: 0; }
 .sidebar-note { color: var(--muted); font-size: 12px; line-height: 1.7; margin: 23px 0 18px; }
 .devices { display: grid; gap: 8px; }
 .device-empty { border: 1px dashed #3d5557; color: var(--muted); padding: 20px 16px; font-size: 12px; line-height: 1.65; }
+.device-empty p { margin: 5px 0 0; }
+.device-empty code { display: block; padding: 9px 0 17px; color: var(--text); font-size: 10px; line-height: 1.6; overflow-wrap: anywhere; user-select: text; }
+.onboard-step { color: var(--amber); font-size: 9px; letter-spacing: .1em; font-weight: 700; }
 .device-button { width: 100%; min-height: 72px; border: 1px solid var(--line); background: var(--panel-light); color: var(--text); padding: 12px; display: flex; align-items: center; gap: 12px; text-align: left; cursor: pointer; transition: border-color .15s, background .15s; }
 .device-button:hover { background: #25383a; border-color: var(--mint); }
+.device-button:disabled { opacity: 1; cursor: default; background: #182326; border-color: var(--line-soft); }
+.device-button.offline .device-icon { color: var(--quiet); border-color: var(--line); }
+.device-button.offline .device-arrow { display: none; }
 .device-icon { display: grid; place-items: center; flex: 0 0 34px; height: 34px; border: 1px solid #49675c; color: var(--mint); font-size: 25px; }
 .device-copy { min-width: 0; display: grid; gap: 5px; }
 .device-copy strong { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .device-copy small { font-size: 9px; color: var(--mint); letter-spacing: .09em; }
+.device-button.offline .device-copy small { color: var(--quiet); }
+.device-description { color: var(--muted); font-size: 10px; line-height: 1.4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.device-description:empty { display: none; }
+.device-activity { color: var(--quiet); font-size: 9px; line-height: 1.4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .device-arrow { margin-left: auto; color: var(--muted); }
 .sidebar-footer { margin-top: auto; padding-top: 30px; color: var(--quiet); font-size: 10px; line-height: 1.65; }
 .sidebar-footer p { margin: 12px 0 0; }

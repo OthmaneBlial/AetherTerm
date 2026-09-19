@@ -43,6 +43,8 @@ print("AetherTerm prototype: operator and device credentials are required.")
 devices = {}  # device_id: websocket
 device_credentials = {}  # device_id: credential hash for revocation checks
 sessions = {}  # session_id: {'device_id': str, 'web_ws': WebSocket, 'ready': bool}
+device_last_seen = {}  # device_id: Unix timestamp, only for this server process
+device_descriptions = {}  # agent-supplied fallback, never an identity claim
 
 async def send_error(websocket: WebSocket, message: str) -> None:
     await websocket.send_text(json.dumps({"type": "error", "message": message}))
@@ -223,7 +225,17 @@ async def web_websocket(websocket: WebSocket):
 
             if msg['type'] == 'list_devices':
                 device_list = [device_id for device_id in devices if active_device(device_id)]
-                await websocket.send_text(json.dumps({"type": "device_list", "devices": device_list}))
+                device_details = []
+                for record in agent_registry.visible_devices():
+                    device_id = record["deviceId"]
+                    device_details.append({
+                        "deviceId": device_id,
+                        "description": record["description"] or device_descriptions.get(device_id, ""),
+                        "connected": device_id in device_list,
+                        "lastSeen": device_last_seen.get(device_id),
+                    })
+                await websocket.send_text(json.dumps({"type": "device_list", "devices": device_list,
+                                                   "deviceDetails": device_details}))
             elif msg['type'] == 'start_session':
                 device_id = msg['deviceId']
                 if not active_device(device_id):
@@ -336,6 +348,8 @@ async def client_websocket(websocket: WebSocket):
             except ProtocolError as exc:
                 await send_error(websocket, str(exc))
                 continue
+            if device_id is not None:
+                device_last_seen[device_id] = time.time()
 
             if msg['type'] == 'register':
                 if device_id is not None:
@@ -364,6 +378,8 @@ async def client_websocket(websocket: WebSocket):
                 token_hash = candidate_hash
                 devices[device_id] = websocket
                 device_credentials[device_id] = token_hash
+                device_last_seen[device_id] = time.time()
+                device_descriptions[device_id] = msg.get('description', '')
                 log_security_event("CLIENT_REGISTERED", client_ip, f"Device: {device_id}")
                 await websocket.send_text(json.dumps({"type": "registered"}))
 
@@ -402,13 +418,15 @@ async def client_websocket(websocket: WebSocket):
         print(f"Client WS error: {e}")
     finally:
         if device_id and devices.get(device_id) is websocket:
+            device_last_seen[device_id] = time.time()
             del devices[device_id]
             device_credentials.pop(device_id, None)
             for session_id, session in list(sessions.items()):
                 if session['device_id'] == device_id:
                     del sessions[session_id]
                     try:
-                        await session['web_ws'].send_text(json.dumps({"type": "session_closed", "sessionId": session_id}))
+                        await session['web_ws'].send_text(json.dumps({"type": "session_closed", "sessionId": session_id,
+                                                                      "reason": "Agent disconnected"}))
                     except Exception:
                         pass
         log_security_event("CLIENT_CONNECTION_CLOSED", client_ip, f"Device: {device_id}")

@@ -67,9 +67,12 @@ def _locked(path: Path):
         os.close(fd)
 
 
-def issue_credential(path: Path, device_id: str, token_file: Path, *, rotate: bool = False) -> None:
+def issue_credential(path: Path, device_id: str, token_file: Path, *, rotate: bool = False,
+                     description: str | None = None) -> None:
     if not DEVICE_ID.fullmatch(device_id):
         raise ValueError("Device ID must be 1–64 ASCII letters, digits, dots, underscores or hyphens")
+    if description is not None and (len(description) > 120 or any(ord(char) < 32 for char in description)):
+        raise ValueError("Description must be at most 120 characters on one line")
     token_file.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     with _locked(path):
         data = _load(path)
@@ -84,10 +87,13 @@ def issue_credential(path: Path, device_id: str, token_file: Path, *, rotate: bo
         try:
             with os.fdopen(fd, "w", encoding="utf-8") as output:
                 output.write(token + "\n")
+            device_description = (description.strip() if description is not None else
+                                  existing.get("description", "") if existing else "")
             data["devices"][device_id] = {
                 "token_hash": _digest(token), "revoked": False,
                 "created_at": existing.get("created_at") if existing else int(time.time()),
                 "rotated_at": int(time.time()),
+                "description": device_description,
             }
             _store(path, data)
         except BaseException:
@@ -125,3 +131,12 @@ class AgentRegistry:
             )
         except (OSError, ValueError, TypeError, KeyError):
             return False
+
+    def visible_devices(self) -> list[dict]:
+        """Return operator-visible metadata without credential hashes or revoked IDs."""
+        try:
+            records = _load(self.path)["devices"]
+            return [{"deviceId": device_id, "description": record.get("description", "")}
+                    for device_id, record in sorted(records.items()) if not record.get("revoked")]
+        except (OSError, ValueError, TypeError, AttributeError):
+            return []

@@ -16,12 +16,13 @@ class AgentCredentialTests(unittest.TestCase):
             base = Path(directory)
             registry_path = base / "agents.json"
             original_file = base / "original.token"
-            issue_credential(registry_path, "linux-one", original_file)
+            issue_credential(registry_path, "linux-one", original_file, description="Build host")
             self.assertEqual(stat.S_IMODE(original_file.stat().st_mode), 0o600)
             token = read_token_file(original_file)
             registry = AgentRegistry(registry_path)
             self.assertIsNotNone(registry.authenticate("linux-one", token))
             self.assertIsNone(registry.authenticate("linux-two", token))
+            self.assertEqual(registry.visible_devices(), [{"deviceId": "linux-one", "description": "Build host"}])
 
             os.chmod(original_file, 0o644)
             with self.assertRaises(ValueError):
@@ -34,11 +35,15 @@ class AgentCredentialTests(unittest.TestCase):
 
             rotated_file = base / "rotated.token"
             issue_credential(registry_path, "linux-one", rotated_file, rotate=True)
+            self.assertEqual(registry.visible_devices()[0]["description"], "Build host")
             self.assertIsNone(registry.authenticate("linux-one", token))
             rotated = read_token_file(rotated_file)
             self.assertIsNotNone(registry.authenticate("linux-one", rotated))
             revoke_device(registry_path, "linux-one")
             self.assertIsNone(registry.authenticate("linux-one", rotated))
+            self.assertEqual(registry.visible_devices(), [])
+            with self.assertRaises(ValueError):
+                issue_credential(registry_path, "bad-device", base / "bad.token", description="bad\nlabel")
 
 
 if __name__ == "__main__":

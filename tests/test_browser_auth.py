@@ -494,6 +494,41 @@ class BrowserAuthTests(unittest.IsolatedAsyncioTestCase):
                 await agent.send(json.dumps({"type": "session_ready", "sessionId": replacement}))
                 self.assertEqual(json.loads(await browser.recv()), {"type": "session_ready", "sessionId": replacement})
 
+    async def test_enrolled_offline_metadata_never_exposes_credentials(self):
+        second_file = Path(self.temp.name) / "second.token"
+        issue_credential(self.agents_file, "second-agent", second_file, description="Build host")
+        second_token = second_file.read_text(encoding="utf-8").strip()
+        origin = f"http://127.0.0.1:{self.port}"
+        status, headers = self.request("POST", "/login", "password=a-test-password-only", {"Origin": origin})
+        self.assertEqual(status, 303)
+        cookie = headers["set-cookie"].split(";", 1)[0]
+        async with websockets.connect(f"ws://127.0.0.1:{self.port}/ws", origin=origin,
+                                      additional_headers={"Cookie": cookie}) as browser:
+            await browser.send(json.dumps({"type": "list_devices"}))
+            listing = json.loads(await browser.recv())
+            self.assertEqual(listing["devices"], [])
+            self.assertEqual(listing["deviceDetails"][1], {"deviceId": "test-agent", "description": "",
+                                                           "connected": False, "lastSeen": None})
+            self.assertEqual(listing["deviceDetails"][0]["description"], "Build host")
+            self.assertNotIn(self.agent_token, json.dumps(listing))
+            self.assertNotIn(second_token, json.dumps(listing))
+            async with websockets.connect(f"ws://127.0.0.1:{self.port}/client") as agent:
+                await agent.send(json.dumps({"type": "register", "deviceId": "second-agent", "token": second_token}))
+                self.assertEqual(json.loads(await agent.recv())["type"], "registered")
+                await browser.send(json.dumps({"type": "list_devices"}))
+                listing = json.loads(await browser.recv())
+                self.assertEqual(listing["devices"], ["second-agent"])
+                self.assertTrue(listing["deviceDetails"][0]["connected"])
+                self.assertIsInstance(listing["deviceDetails"][0]["lastSeen"], float)
+            await browser.send(json.dumps({"type": "list_devices"}))
+            listing = json.loads(await browser.recv())
+            self.assertFalse(listing["deviceDetails"][0]["connected"])
+            self.assertIsInstance(listing["deviceDetails"][0]["lastSeen"], float)
+            revoke_device(self.agents_file, "second-agent")
+            await browser.send(json.dumps({"type": "list_devices"}))
+            listing = json.loads(await browser.recv())
+            self.assertEqual([device["deviceId"] for device in listing["deviceDetails"]], ["test-agent"])
+
     async def test_revoked_real_agent_stops_instead_of_retrying(self):
         agent, agent_log = self.start_real_agent()
         try:
