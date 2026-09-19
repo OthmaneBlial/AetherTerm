@@ -228,7 +228,7 @@ function connect() {
     send({ type: 'list_devices' })
   })
   socket.addEventListener('message', handleMessage)
-  socket.addEventListener('close', event => {
+  socket.addEventListener('close', async event => {
     online = false
     pendingDevice = null
     for (const id of [...sessions.keys()]) removeSession(id)
@@ -239,6 +239,14 @@ function connect() {
       reauthLink.hidden = false
       return
     }
+    try {
+      const response = await fetch('/auth/status', { cache: 'no-store' })
+      if (response.status === 401) {
+        setNotice('Access expired or was revoked. Sign in again.', 'error')
+        reauthLink.hidden = false
+        return
+      }
+    } catch { /* Server is offline; retry below. */ }
     setNotice('Connection lost. Retrying; previous shells are closed.', 'error')
     reconnectTimer = setTimeout(connect, reconnectDelay)
     reconnectDelay = Math.min(reconnectDelay * 2, 30000)

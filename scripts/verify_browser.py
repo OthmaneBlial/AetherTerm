@@ -46,8 +46,9 @@ async def main():
         server_log = (directory / "server.log").open("w+", encoding="utf-8")
         agent_log = (directory / "agent.log").open("w+", encoding="utf-8")
         server = agent = None
+        server_command = [str(executable_dir / "aetherterm-server"), "--port", str(port)]
         try:
-            server = subprocess.Popen([str(executable_dir / "aetherterm-server"), "--port", str(port)],
+            server = subprocess.Popen(server_command,
                                       cwd=directory, env=environment, stdout=server_log,
                                       stderr=subprocess.STDOUT, start_new_session=True)
             for _ in range(100):
@@ -87,6 +88,37 @@ async def main():
                     await page.keyboard.type("printf 'BROWSER_OK\\n'")
                     await page.keyboard.press("Enter")
                     await page.get_by_text("BROWSER_OK", exact=True).wait_for(state="attached", timeout=10000)
+                    assert not errors, f"Browser console errors before restart: {errors}"
+
+                    stop(server)
+                    server = subprocess.Popen(server_command, cwd=directory, env=environment,
+                                              stdout=server_log, stderr=subprocess.STDOUT, start_new_session=True)
+                    for _ in range(100):
+                        try:
+                            connection = http.client.HTTPConnection("127.0.0.1", port, timeout=0.2)
+                            connection.request("GET", "/login")
+                            response = connection.getresponse()
+                            response.read()
+                            connection.close()
+                            if response.status == 200:
+                                break
+                        except OSError:
+                            await asyncio.sleep(0.1)
+                    else:
+                        raise AssertionError("Restarted server did not start")
+                    await expect(page.get_by_role("link", name="Sign in again")).to_be_visible(timeout=20000)
+                    await expect(page.get_by_role("heading", name="Your next shell starts here.")).to_be_visible()
+                    await page.get_by_role("link", name="Sign in again").click()
+                    await page.get_by_label("Operator password").fill("temporary-browser-password")
+                    await page.get_by_role("button", name="Enter console").click()
+                    device = page.get_by_role("button", name=re.compile(r"browser-agent, online, open shell"))
+                    await device.click(timeout=20000)
+                    await expect(page.get_by_text("Shell ready on browser-agent.", exact=False)).to_be_visible()
+                    await page.locator(".xterm-helper-textarea").focus()
+                    await page.keyboard.type("printf 'BROWSER_RETURNED\\n'")
+                    await page.keyboard.press("Enter")
+                    await page.get_by_text("BROWSER_RETURNED", exact=True).wait_for(state="attached", timeout=10000)
+                    errors.clear()  # Network errors from the deliberate outage are expected.
                     await page.set_viewport_size({"width": 375, "height": 812})
                     for _ in range(50):
                         widths = await page.evaluate("""() => ({
@@ -123,7 +155,7 @@ async def main():
                 stop(server)
                 server_log.close()
                 agent_log.close()
-    print("Chromium login, real PTY, mobile layout and sign-out: PASS")
+    print("Chromium login, real PTY, server restart, reauthentication, mobile layout and sign-out: PASS")
 
 
 if __name__ == "__main__":

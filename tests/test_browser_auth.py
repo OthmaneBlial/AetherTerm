@@ -124,6 +124,8 @@ class BrowserAuthTests(unittest.IsolatedAsyncioTestCase):
         cookie = headers["set-cookie"].split(";", 1)[0]
         self.assertTrue(cookie.startswith(f"{COOKIE_NAME}="))
         self.assertIn("httponly", headers["set-cookie"].lower())
+        self.assertEqual(self.request("GET", "/auth/status")[0], 401)
+        self.assertEqual(self.request("GET", "/auth/status", headers={"Cookie": cookie})[0], 204)
         self.assertEqual(self.request("GET", "/web/", headers={"Cookie": cookie})[0], 200)
         with self.assertRaises(InvalidStatus):
             async with websockets.connect(uri, origin=origin, additional_headers={"Cookie": cookie}):
@@ -168,6 +170,7 @@ class BrowserAuthTests(unittest.IsolatedAsyncioTestCase):
                 with self.assertRaises(ConnectionClosed):
                     await asyncio.wait_for(owner.recv(), 2)
         self.assertEqual(self.request("GET", "/web/", headers={"Cookie": cookie})[0], 303)
+        self.assertEqual(self.request("GET", "/auth/status", headers={"Cookie": cookie})[0], 401)
         self.server_log.flush()
         self.server_log.seek(0)
         self.assertNotIn('"event": "WEB_ERROR"', self.server_log.read())

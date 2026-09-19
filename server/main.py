@@ -159,6 +159,14 @@ async def show_login(request: Request):
     return login_page(state)
 
 
+@router.get("/auth/status")
+async def auth_status(request: Request):
+    state: ServerState = request.app.state.runtime
+    active = state.operator_auth.session_key(request.cookies.get(COOKIE_NAME)) is not None
+    return PlainTextResponse("", status_code=204 if active else 401,
+                             headers={"Cache-Control": "no-store"})
+
+
 @router.post("/login")
 async def sign_in(request: Request):
     state: ServerState = request.app.state.runtime
