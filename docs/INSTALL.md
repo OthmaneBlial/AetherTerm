@@ -9,9 +9,10 @@ The checked-in Web bundle is included in the Python wheel. From a checkout:
 ```bash
 python3.13 -m venv .venv
 source .venv/bin/activate
-python -m pip install build
+python -m pip install build==1.6.1
 python -m build --wheel --sdist
-python -m pip install dist/aetherterm-0.1.0a0-py3-none-any.whl
+python -m pip install --require-hashes -r requirements-runtime.lock
+python -m pip install --no-deps dist/aetherterm-0.1.0a0-py3-none-any.whl
 python -m pip check
 ```
 

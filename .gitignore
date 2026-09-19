@@ -12,4 +12,6 @@ artifacts/
 operator.json
 agents.json
 *.lock
+!requirements.lock
+!requirements-runtime.lock
 .DS_Store
