@@ -1,6 +1,6 @@
 # AetherTerm — audit du dépôt et feuille de route vers une première release crédible
 
-> État observé le 19 septembre 2026 sur `main` (`c367976`). Ce document décrit des travaux **à faire** ; aucune case n'est réputée terminée. L'audit repose sur les huit fichiers suivis par Git et sur les essais locaux décrits ci-dessous. Les releases, métadonnées et protections éventuelles du dépôt GitHub distant n'ont pas été auditées.
+> Audit initial du 19 septembre 2026 sur `main` (`c367976`). La section « Ce que montre réellement le dépôt » décrit ce **point de départ historique**, avant les changements suivis dans « Suivi d'exécution ». Les cases cochées indiquent les tâches validées depuis cet audit ; les cases ouvertes signalent encore du travail. Les releases, métadonnées et protections éventuelles du dépôt GitHub distant n'ont pas été auditées lors de l'audit initial.
 
 ## Décision de produit et règle de publication
 
@@ -61,7 +61,7 @@ Une case est cochée seulement après satisfaction de **tous** les critères d'a
 - [ ] 2.3 Reconnexion et états d'erreur — ancien shell terminé et nouvel agent enregistré après redémarrage réel du serveur ; révocation arrête l'agent, backoff réinitialisé après succès ; parcours navigateur hors ligne/retour et délais mesurés à compléter.
 - [ ] 3.1 Premier démarrage jusqu'au shell — appareils enrôlés hors ligne, description, dernière activité de ce processus, étapes d'enrôlement et récupération d'état vérifiés dans Chrome ; installation Linux propre et 3 à 5 essais observés restent nécessaires.
 - [ ] 3.2 Interface accessible et responsive — vrais boutons, focus et sortie lisible par lecteur d'écran ; débordement horizontal absent à 320, 375, 390, 768 et 1280 px dans Chrome ; interaction tactile réelle et revue clavier complète à faire.
-- [ ] 3.3 Assets Web maîtrisés et identité visuelle — xterm.js 6.0.0 et FitAddon 0.11.0 figés, build local et licences incluses ; favicon, CSP, paquet installable et essai hors ligne encore requis.
+- [ ] 3.3 Assets Web maîtrisés et identité visuelle — xterm.js 6.0.0 et FitAddon 0.11.0 figés, build local et licences incluses ; favicon et CSP vérifiés avec connexion, PTY et déconnexion dans Chrome ; paquet installable et essai hors ligne depuis ce paquet encore requis.
 - [ ] 4.1 Architecture et configuration testables.
 - [ ] 4.2 Suite de tests utile.
 - [ ] 4.3 Dépendances et maintenance vérifiables.

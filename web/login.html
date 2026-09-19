@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#101719">
+    <title>AetherTerm · Sign in</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <style>
+      :root { color-scheme: dark; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; --ink: #101719; --text: #e8eee9; --muted: #9aaba9; --mint: #9fdac1; --amber: #e4b467; }
+      * { box-sizing: border-box; }
+      body { min-width: 320px; min-height: 100vh; margin: 0; color: var(--text); background: var(--ink); }
+      .layout { min-height: 100vh; display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(370px, .9fr); }
+      .intro { min-height: 100vh; padding: clamp(28px, 5vw, 70px); display: flex; flex-direction: column; background: radial-gradient(circle at 70% 20%, #2c4b4055 0, transparent 38%), linear-gradient(#9fdac10b 1px, transparent 1px), linear-gradient(90deg, #9fdac10b 1px, transparent 1px), #142023; background-size: auto, 40px 40px, 40px 40px, auto; border-right: 1px solid #334549; }
+      .brand { display: inline-flex; align-items: center; gap: 14px; font-size: 18px; font-weight: 800; letter-spacing: .16em; white-space: nowrap; }
+      .brand b { color: var(--mint); }
+      .brand-mark { width: 27px; height: 27px; border: 1px solid var(--mint); padding: 5px; display: grid; grid-template-columns: repeat(3, 1fr); align-items: end; gap: 2px; transform: rotate(-8deg); }
+      .brand-mark i { display: block; height: 6px; background: var(--mint); }
+      .brand-mark i:nth-child(2) { height: 15px; }
+      .brand-mark i:nth-child(3) { height: 10px; }
+      .intro-copy { margin: auto 0; max-width: 550px; }
+      .eyebrow { color: var(--mint); font-size: 10px; font-weight: 700; letter-spacing: .18em; }
+      h1 { margin: 22px 0 20px; font-size: clamp(42px, 5vw, 72px); line-height: 1.06; letter-spacing: -.07em; }
+      h1 span { color: var(--amber); }
+      .intro-copy p { max-width: 445px; color: var(--muted); font-size: 13px; line-height: 1.8; }
+      .intro-footer { color: #7d938f; font-size: 10px; letter-spacing: .08em; }
+      .sign-in { display: flex; align-items: center; justify-content: center; padding: 38px; }
+      .form-panel { width: min(420px, 100%); }
+      .section-label { color: var(--mint); font-size: 10px; letter-spacing: .18em; }
+      h2 { margin: 14px 0 12px; font-size: clamp(30px, 4vw, 43px); letter-spacing: -.06em; }
+      .form-panel > p { color: var(--muted); font-size: 12px; line-height: 1.75; margin-bottom: 30px; }
+      label { display: block; margin-bottom: 10px; font-size: 11px; color: var(--text); }
+      input { width: 100%; padding: 14px 15px; border: 1px solid #536762; outline: none; background: #1b292b; color: var(--text); font: inherit; border-radius: 0; }
+      input:focus-visible { border-color: var(--mint); box-shadow: 0 0 0 3px #9fdac123; }
+      button { width: 100%; margin-top: 16px; padding: 14px 18px; background: var(--mint); border: 0; color: #13211c; cursor: pointer; font: inherit; font-weight: 700; text-align: left; display: flex; justify-content: space-between; }
+      button:hover { background: #c3edd9; }
+      button:focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; }
+      .error { background: #3a2628; color: #f3b2aa !important; padding: 13px 15px; border-left: 2px solid #e68b83; line-height: 1.7; margin: 0 0 24px !important; }
+      .error code { color: #fff; overflow-wrap: anywhere; }
+      .help { margin: 25px 0 0; padding-top: 17px; border-top: 1px solid #344548; color: #8fa19e; font-size: 10px; line-height: 1.7; }
+      @media (max-width: 760px) { .layout { display: block; } .intro { min-height: 270px; border-right: 0; border-bottom: 1px solid #334549; gap: 35px; } .intro-copy { margin: 0; } .intro-copy h1 { margin: 10px 0; font-size: clamp(32px, 8vw, 52px); } .intro-copy p, .intro-footer { display: none; } .sign-in { padding: 38px 24px 56px; } }
+    </style>
+  </head>
+  <body>
+    <div class="layout">
+      <aside class="intro">
+        <div class="brand"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span><span>AETHER<b>TERM</b></span></div>
+        <div class="intro-copy"><span class="eyebrow">SELF-HOSTED / OPERATOR ACCESS</span><h1>Your machines.<br>One console<span>.</span></h1><p>Open a shell on an enrolled agent from your browser. Each session belongs to this operator connection and closes when it disconnects.</p></div>
+        <span class="intro-footer">AETHERTERM · PRIVATE CONTROL PLANE</span>
+      </aside>
+      <main class="sign-in">
+        <div class="form-panel">
+          <span class="section-label">01 / AUTHENTICATE</span>
+          <h2>Welcome back.</h2>
+          <p>Sign in to view enrolled devices and start a shell.</p>
+          <!-- SERVER_NOTICE -->
+          <form method="post" action="/login">
+            <label for="password">Operator password</label>
+            <input id="password" name="password" type="password" autocomplete="current-password" required>
+            <button type="submit"><span>Enter console</span><span aria-hidden="true">↗</span></button>
+          </form>
+          <div class="help">Use the server’s local URL for a local session. Remote access requires a trusted HTTPS/WSS endpoint.</div>
+        </div>
+      </main>
+    </div>
+  </body>
+</html>

@@ -1,8 +1,10 @@
 from fastapi import FastAPI, Request, WebSocket
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, RedirectResponse
 import asyncio
 import json
+from pathlib import Path
+import re
 import uuid
 from urllib.parse import parse_qs
 
@@ -106,17 +108,22 @@ def same_origin(request: Request) -> bool:
 
 
 def login_page(message: str = "") -> HTMLResponse:
-    notice = "<p role='alert'>Sign in failed.</p>" if message else ""
+    notice = '<p class="error" role="alert">Sign in failed. Check the password and try again.</p>' if message else ""
     if not operator_auth.configured():
-        notice = "<p role='alert'>Operator setup required. Run <code>python -m server.admin init</code> on the server, then restart it.</p>"
-    body = f"""<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>AetherTerm sign in</title><style>body{{font:16px system-ui;background:#171b20;color:#f1f5f9;margin:0;display:grid;min-height:100vh;place-items:center}}
-main{{width:min(90vw,380px);background:#222a33;padding:2rem;border-radius:12px}}label,input,button{{display:block;width:100%;box-sizing:border-box}}
-input,button{{font:inherit;padding:.8rem;margin:.7rem 0 1rem;border-radius:6px}}button{{background:#6ee7b7;border:0;cursor:pointer}}a{{color:#6ee7b7}}</style>
-<main><h1>AetherTerm</h1><p>Sign in to the operator console.</p>{notice}<form method="post" action="/login">
-<label for="password">Operator password</label><input id="password" name="password" type="password" autocomplete="current-password" required>
-<button type="submit">Sign in</button></form><p>Run only on loopback until remote TLS setup is complete.</p></main></html>"""
+        notice = ('<p class="error" role="alert">Operator setup required. Run '
+                  '<code>python -m server.admin init</code> on the server, then restart it.</p>')
+    body = (Path(web_dir) / "login.html").read_text(encoding="utf-8").replace("<!-- SERVER_NOTICE -->", notice)
     return HTMLResponse(body, headers={"Cache-Control": "no-store"})
+
+
+def content_security_policy(request: Request) -> str:
+    host = request.headers.get("host", "")
+    websocket_source = ""
+    if re.fullmatch(r"[A-Za-z0-9.:[\]-]+", host):
+        websocket_source = f" {'wss' if request.url.scheme == 'https' else 'ws'}://{host}"
+    return ("default-src 'none'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; "
+            "form-action 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
+            f"img-src 'self' data:; font-src 'self'; connect-src 'self'{websocket_source}")
 
 
 @app.middleware("http")
@@ -126,9 +133,18 @@ async def protect_web(request: Request, call_next):
     if request.url.path.startswith("/web") and not operator_auth.session_key(request.cookies.get(COOKIE_NAME)):
         return RedirectResponse("/login", status_code=303)
     response = await call_next(request)
+    response.headers["Content-Security-Policy"] = content_security_policy(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Referrer-Policy"] = "same-origin"
+    response.headers["X-Frame-Options"] = "DENY"
     if request.url.path.startswith("/web"):
         response.headers["Cache-Control"] = "no-store"
     return response
+
+
+@app.get("/favicon.svg")
+async def favicon():
+    return FileResponse(Path(web_dir) / "favicon.svg", media_type="image/svg+xml")
 
 
 @app.get("/login")

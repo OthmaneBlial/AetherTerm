@@ -98,6 +98,14 @@ class BrowserAuthTests(unittest.IsolatedAsyncioTestCase):
     async def test_login_origin_and_cross_browser_session_ownership(self):
         origin = f"http://127.0.0.1:{self.port}"
         uri = f"ws://127.0.0.1:{self.port}/ws"
+        status, login_headers = self.request("GET", "/login")
+        self.assertEqual(status, 200)
+        self.assertIn("script-src 'self'", login_headers["content-security-policy"])
+        self.assertIn(f"connect-src 'self' ws://127.0.0.1:{self.port}",
+                      login_headers["content-security-policy"])
+        self.assertEqual(login_headers["x-frame-options"], "DENY")
+        self.assertEqual(login_headers["referrer-policy"], "same-origin")
+        self.assertEqual(self.request("GET", "/favicon.svg")[0], 200)
         status, _ = self.request("GET", "/web/")
         self.assertEqual(status, 303)
         with self.assertRaises(InvalidStatus):

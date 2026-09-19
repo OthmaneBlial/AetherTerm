@@ -8,11 +8,11 @@ An early prototype that relays a shell on an agent machine to a browser through 
 
 - A Python FastAPI server with browser (`/ws`) and agent (`/client`) WebSocket endpoints.
 - A Python agent that creates a `/bin/bash` PTY on request.
-- An operator password login and a single HTML/Vue page that lists connected IDs, displays text output and sends command lines. Sessions are tied to the browser WebSocket that opened them.
+- An operator password login and a bundled xterm.js console that lists enrolled devices and opens interactive shells. Sessions are tied to the browser WebSocket that opened them.
 - Device-bound agent credentials stored in owner-readable files, with server-side rotation and revocation.
-- Agent reconnection attempts after connection failures. Browser reconnection and safe multi-session handling are not implemented.
+- Agent reconnection attempts after connection failures, plus isolated PTYs for simultaneous local sessions. Existing shells close after disconnection; a returning agent needs a new session.
 
-The Web page is a text display, not a complete terminal emulator. ANSI sequences are stripped and Unicode handling is unreliable. The page derives its WebSocket URL from the page origin, but remote HTTPS/WSS deployment has not been validated. Operator and agent credentials are created outside the repository; no working defaults are shipped.
+The browser terminal uses locally bundled xterm.js. Unicode, ANSI colors, `less`, Ctrl+C and resize have been exercised on macOS in Chrome; the full terminal interaction set and Linux behavior still need validation. The page derives its WebSocket URL from the page origin, but remote HTTPS/WSS deployment has not been validated outside a local proxy test. Operator and agent credentials are created outside the repository; no working defaults are shipped.
 
 ## Loopback-only development run
 
