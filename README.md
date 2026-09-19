@@ -16,6 +16,8 @@ The browser terminal uses locally bundled xterm.js. Unicode, ANSI colors, `less`
 
 ## Loopback-only development run
 
+The [local quickstart](docs/QUICKSTART.md) includes the full first-shell sequence, a second identity, rotation and shutdown.
+
 This flow was exercised on macOS with Python 3.13. It is a local prototype run, not a supported release or a Linux compatibility claim. From the project root:
 
 ```bash
