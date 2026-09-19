@@ -10,6 +10,7 @@ import socket
 import subprocess
 import sys
 import tempfile
+import time
 
 from playwright.async_api import async_playwright, expect
 
@@ -100,6 +101,25 @@ async def main():
                     await page.get_by_text("BROWSER_OK", exact=True).wait_for(state="attached", timeout=10000)
                     assert not external_requests, f"Web UI requested external assets: {external_requests}"
                     assert not errors, f"Browser console errors before restart: {errors}"
+
+                    outage_started = time.monotonic()
+                    await page.context.set_offline(True)
+                    await expect(page.locator("#connection-status")).to_have_text("Server offline", timeout=15000)
+                    await expect(page.get_by_text("Connection lost. Retrying; previous shells are closed.")).to_be_visible()
+                    await expect(page.get_by_role("heading", name="Your next shell starts here.")).to_be_visible()
+                    detection_seconds = time.monotonic() - outage_started
+                    recovery_started = time.monotonic()
+                    await page.context.set_offline(False)
+                    await expect(page.locator("#connection-status")).to_have_text("Server connected", timeout=15000)
+                    device = page.get_by_role("button", name=re.compile(r"browser-agent, online, open shell"))
+                    await device.click()
+                    await expect(page.get_by_text("Shell ready on browser-agent.", exact=False)).to_be_visible()
+                    await page.locator(".xterm-helper-textarea").focus()
+                    await page.keyboard.type("printf 'BROWSER_AFTER_OUTAGE\\n'")
+                    await page.keyboard.press("Enter")
+                    await page.get_by_text("BROWSER_AFTER_OUTAGE", exact=True).wait_for(state="attached", timeout=10000)
+                    print(f"Browser outage: detected in {detection_seconds:.2f}s; "
+                          f"reconnected in {time.monotonic() - recovery_started:.2f}s")
 
                     stop(server)
                     server = subprocess.Popen(server_command, cwd=directory, env=environment,
