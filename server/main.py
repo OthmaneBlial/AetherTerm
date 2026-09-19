@@ -1,4 +1,4 @@
-from fastapi import APIRouter, FastAPI, Request, WebSocket
+from fastapi import APIRouter, FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, RedirectResponse
 import asyncio
@@ -319,6 +319,8 @@ async def web_websocket(websocket: WebSocket):
                 if device_socket:
                     await send_json(device_socket, {"type": "close_session", "sessionId": session_id})
                 await send_json(websocket, {"type": "session_closed", "sessionId": session_id})
+    except WebSocketDisconnect:
+        pass
     except Exception as e:
         log_security_event("WEB_ERROR", client_ip, type(e).__name__)
     finally:
@@ -458,6 +460,8 @@ async def client_websocket(websocket: WebSocket):
             elif msg['type'] == 'heartbeat':
                 await send_json(websocket, {"type": "heartbeat_ack"})
 
+    except WebSocketDisconnect:
+        pass
     except Exception as e:
         log_security_event("CLIENT_ERROR", client_ip, type(e).__name__)
     finally:

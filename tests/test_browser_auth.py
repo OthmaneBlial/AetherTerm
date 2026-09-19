@@ -157,6 +157,9 @@ class BrowserAuthTests(unittest.IsolatedAsyncioTestCase):
                 with self.assertRaises(ConnectionClosed):
                     await asyncio.wait_for(owner.recv(), 2)
         self.assertEqual(self.request("GET", "/web/", headers={"Cookie": cookie})[0], 303)
+        self.server_log.flush()
+        self.server_log.seek(0)
+        self.assertNotIn('"event": "WEB_ERROR"', self.server_log.read())
 
     async def test_operator_credential_change_revokes_live_browser(self):
         origin = f"http://127.0.0.1:{self.port}"

@@ -60,15 +60,15 @@ Une case est cochée seulement après satisfaction de **tous** les critères d'a
 - [ ] 2.2 Terminal interactif et Unicode exact — xterm.js local, UTF-8 fragmenté, couleurs ANSI, `less`, Ctrl+C et redimensionnement testés avec Chrome et un PTY macOS ; Linux, `vim`, flèches et presse-papiers restent à valider.
 - [ ] 2.3 Reconnexion et états d'erreur — ancien shell terminé et nouvel agent enregistré après redémarrage réel du serveur ; révocation arrête l'agent, backoff réinitialisé après succès ; parcours navigateur hors ligne/retour et délais mesurés à compléter.
 - [ ] 3.1 Premier démarrage jusqu'au shell — appareils enrôlés hors ligne, description, dernière activité de ce processus, étapes d'enrôlement et récupération d'état vérifiés dans Chrome ; installation Linux propre et 3 à 5 essais observés restent nécessaires.
-- [ ] 3.2 Interface accessible et responsive — vrais boutons, focus et sortie lisible par lecteur d'écran ; débordement horizontal absent à 320, 375, 390, 768 et 1280 px dans Chrome ; interaction tactile réelle et revue clavier complète à faire.
+- [ ] 3.2 Interface accessible et responsive — vrais boutons, focus et sortie lisible par lecteur d'écran ; débordement horizontal absent à 320, 375, 390, 768 et 1280 px dans Chrome local, et parcours Chromium CI à 375 px vert dans le run [35445259789](https://github.com/OthmaneBlial/AetherTerm/actions/runs/35445259789) ; interaction tactile réelle et revue clavier complète à faire.
 - [ ] 3.3 Assets Web maîtrisés et identité visuelle — xterm.js 6.0.0 et FitAddon 0.11.0 figés, build local et licences incluses ; favicon et CSP vérifiés avec connexion, PTY et déconnexion dans Chrome ; wheel installé en venv macOS propre avec assets servis localement et PTY réel ; image et essai hors ligne explicite encore requis.
 - [ ] 4.1 Architecture et configuration testables — factory FastAPI, état par instance et événements d'audit JSON bornés testés ; configuration typée complète et protocole versionné encore requis.
-- [ ] 4.2 Suite de tests utile.
+- [ ] 4.2 Suite de tests utile — 18 tests Python couvrant auth, agents, injection, protocole, PTY et reconnexion ; un parcours Chromium avec vrai shell passe sur Linux CI ; couverture sensible et répétabilité prolongée encore à revoir.
 - [ ] 4.3 Dépendances et maintenance vérifiables — manifeste Python et dépendances directes figées ; scans Python du venv installé et npm exécutés localement sans avis connu après mise à jour du `pip` de test ; CI de scan en attente, résolution transitive, matrice élargie et lint encore requis.
 - [ ] 5.1 Installation et déploiement reproductibles.
 - [ ] 5.2 Documentation architecture, sécurité et opérations.
 - [ ] 5.3 README et captures réelles.
-- [ ] 6.1 CI bloquante — run [35444996684](https://github.com/OthmaneBlial/AetherTerm/actions/runs/35444996684) vert sur `86fdb31` avec actions figées (Linux Python 3.13, PTY réel, wheel installé, assets Web et scans) ; test navigateur ajouté mais non encore validé en CI, politique de blocage PR encore requise.
+- [ ] 6.1 CI bloquante — run [35445259789](https://github.com/OthmaneBlial/AetherTerm/actions/runs/35445259789) vert sur `997194f` avec actions figées (Linux Python 3.13, PTY réel, wheel installé, assets Web, scans et Chromium avec shell réel) ; politique de blocage PR et artefacts de diagnostic d'échec encore requis.
 - [ ] 6.2 Artefacts téléchargeables/installables — wheel local installé et testé sur macOS 3.13 ; conteneur, binaire Linux, installation Linux et téléchargements publiés encore requis.
 - [ ] 6.3 Contributions et présentation GitHub.
 - [ ] 6.4 Première release vérifiée.
