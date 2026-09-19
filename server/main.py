@@ -151,6 +151,11 @@ async def favicon(request: Request):
     return FileResponse(request.app.state.runtime.web_dir / "favicon.svg", media_type="image/svg+xml")
 
 
+@router.get("/favicon.ico")
+async def legacy_favicon(request: Request):
+    return FileResponse(request.app.state.runtime.web_dir / "favicon.ico", media_type="image/x-icon")
+
+
 @router.get("/login")
 async def show_login(request: Request):
     state: ServerState = request.app.state.runtime

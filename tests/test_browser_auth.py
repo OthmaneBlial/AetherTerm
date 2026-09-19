@@ -110,6 +110,7 @@ class BrowserAuthTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(login_headers["x-frame-options"], "DENY")
         self.assertEqual(login_headers["referrer-policy"], "same-origin")
         self.assertEqual(self.request("GET", "/favicon.svg")[0], 200)
+        self.assertEqual(self.request("GET", "/favicon.ico")[0], 200)
         status, _ = self.request("GET", "/web/")
         self.assertEqual(status, 303)
         with self.assertRaises(InvalidStatus):

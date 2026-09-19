@@ -35,4 +35,4 @@ package-dir = {aetherterm_assets = "web"}
 include-package-data = false
 
 [tool.setuptools.package-data]
-aetherterm_assets = ["*.html", "*.svg", "assets/*", "licenses/*"]
+aetherterm_assets = ["*.html", "*.svg", "*.ico", "assets/*", "licenses/*"]

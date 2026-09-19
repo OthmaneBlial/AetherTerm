@@ -130,6 +130,8 @@ def main():
             assert status == 200 and b"assets/app.js" in page, status
             status, _, script = request(port, "GET", "/web/assets/app.js", headers={"Cookie": cookie})
             assert status == 200 and len(script) > 100_000, (status, len(script))
+            status, _, icon = request(port, "GET", "/favicon.ico")
+            assert status == 200 and icon.startswith(b"\x00\x00\x01\x00"), status
             asyncio.run(exercise(port, cookie))
         except BaseException:
             server_log.flush()
