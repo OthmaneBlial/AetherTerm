@@ -120,7 +120,11 @@ async def main():
                     await page.get_by_text("BROWSER_RETURNED", exact=True).wait_for(state="attached", timeout=10000)
                     await page.keyboard.type("cat")
                     await page.keyboard.press("Enter")
-                    await page.keyboard.insert_text("Café 漢字")
+                    await page.context.grant_permissions(["clipboard-read", "clipboard-write"],
+                                                         origin=f"http://127.0.0.1:{port}")
+                    await page.evaluate("text => navigator.clipboard.writeText(text)", "Café 漢字")
+                    await page.locator(".xterm-helper-textarea").focus()
+                    await page.keyboard.press("Control+V")
                     await page.keyboard.press("Enter")
                     try:
                         await page.get_by_text("Café 漢字", exact=False).wait_for(state="attached", timeout=10000)
