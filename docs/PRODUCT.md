@@ -1,6 +1,6 @@
 # Product contract for AetherTerm v1
 
-Status: implementation contract, not a description of the current prototype. The current code does not satisfy the security requirements below.
+Status: v1 implementation contract. Local browser sign-in, device credentials, separate PTYs and a bundled terminal now have tests; remote deployment, packaging and release gates remain open. This is not a production-readiness claim.
 
 ## Audience and job
 
@@ -24,7 +24,7 @@ The candidate value is a self-hosted, browser-accessible control plane for a sma
 2. **Second device:** enroll a distinct agent identity, see both names and connection states, and use each independently without crossed output.
 3. **Network interruption:** observe a clear offline state, keep no orphan shell, reconnect the agent with bounded backoff, sign in again if the browser session expired, then start a fresh PTY.
 
-These journeys define future acceptance tests. They are not claims that the current checkout passes them. User-observation results and competitive measurements belong in `docs/RESEARCH_STATUS.md` and `docs/POSITIONING.md` when collected.
+These journeys define release acceptance. Automated local and Linux CI checks cover parts of them; user-observation results and competitive measurements belong in `docs/RESEARCH_STATUS.md` and `docs/POSITIONING.md` when collected.
 
 ## Release proof
 

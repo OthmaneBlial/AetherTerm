@@ -56,7 +56,7 @@ Une case est cochée seulement après satisfaction de **tous** les critères d'a
 - [x] 1.2 Enrôlement et révocation d'agents — identité liée à l'appareil, fichier 0600, rotation et révocation vérifiées par tests et aller-retour réel sur boucle locale.
 - [ ] 1.3 Transport distant chiffré — HTTPS/WSS direct et proxy Caddy 2.11.4 testés localement avec certificat approuvé/rejeté ; accès distant et navigateur graphique non vérifiés.
 - [ ] 1.4 Protocole et ressources bornés — schémas, trames, quotas de sessions, démarrage borné à 10 s, envois serveur vers navigateur/agent bornés à 3 s et limiteurs IP distincts testés ; charge modérée, fermeture lente et mémoire/CPU encore à mesurer.
-- [ ] 2.1 PTY isolés et cycle de vie — deux shells et navigateurs, fermeture explicite, fermeture du navigateur, SIGTERM, SIGINT et coupure du serveur testés localement ; run Linux [35444687825](https://github.com/OthmaneBlial/AetherTerm/actions/runs/35444687825) vert pour les scénarios précédant SIGINT ; nouveau test SIGINT Linux en attente.
+- [x] 2.1 PTY isolés et cycle de vie — deux shells et navigateurs, fermeture explicite, fermeture du navigateur, SIGTERM/SIGINT de l'agent et coupure/redémarrage du serveur validés localement et par le run Linux [35444767496](https://github.com/OthmaneBlial/AetherTerm/actions/runs/35444767496) sur `f0b1cdd` ; aucune reprise d'ancien shell n'est revendiquée.
 - [ ] 2.2 Terminal interactif et Unicode exact — xterm.js local, UTF-8 fragmenté, couleurs ANSI, `less`, Ctrl+C et redimensionnement testés avec Chrome et un PTY macOS ; Linux, `vim`, flèches et presse-papiers restent à valider.
 - [ ] 2.3 Reconnexion et états d'erreur — ancien shell terminé et nouvel agent enregistré après redémarrage réel du serveur ; révocation arrête l'agent, backoff réinitialisé après succès ; parcours navigateur hors ligne/retour et délais mesurés à compléter.
 - [ ] 3.1 Premier démarrage jusqu'au shell — appareils enrôlés hors ligne, description, dernière activité de ce processus, étapes d'enrôlement et récupération d'état vérifiés dans Chrome ; installation Linux propre et 3 à 5 essais observés restent nécessaires.
@@ -68,7 +68,7 @@ Une case est cochée seulement après satisfaction de **tous** les critères d'a
 - [ ] 5.1 Installation et déploiement reproductibles.
 - [ ] 5.2 Documentation architecture, sécurité et opérations.
 - [ ] 5.3 README et captures réelles.
-- [ ] 6.1 CI bloquante — run [35444526753](https://github.com/OthmaneBlial/AetherTerm/actions/runs/35444526753) vert sur `9a443f8` (Linux Python 3.13, PTY réel, wheel installé, assets Web) ; tests navigateur, scans et politique de blocage PR encore requis.
+- [ ] 6.1 CI bloquante — run [35444767496](https://github.com/OthmaneBlial/AetherTerm/actions/runs/35444767496) vert sur `f0b1cdd` avec actions figées (Linux Python 3.13, PTY réel, wheel installé, assets Web) ; tests navigateur, scans et politique de blocage PR encore requis.
 - [ ] 6.2 Artefacts téléchargeables/installables — wheel local installé et testé sur macOS 3.13 ; conteneur, binaire Linux, installation Linux et téléchargements publiés encore requis.
 - [ ] 6.3 Contributions et présentation GitHub.
 - [ ] 6.4 Première release vérifiée.

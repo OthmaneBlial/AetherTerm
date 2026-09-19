@@ -1,6 +1,6 @@
 # Threat model and access contract
 
-Status: target for v1 implementation. Browser sign-in, WebSocket ownership, device-bound agent credentials and two local PTYs have integration tests. Remote cleartext is rejected in code; direct HTTPS/WSS and a Caddy proxy were tested locally with a temporary trusted certificate. External network access and a graphical browser remain unverified. Keep the current prototype on loopback outside that controlled proxy test.
+Status: target for v1 implementation. Browser sign-in, WebSocket ownership, device-bound agent credentials and two local PTYs have integration tests. Remote cleartext is rejected in code; direct HTTPS/WSS and a Caddy proxy were tested locally with a temporary trusted certificate. Chrome exercised the local login and PTY, but graphical remote HTTPS and external network access remain unverified. Keep the current prototype on loopback outside that controlled proxy test.
 
 ## Assets and trust boundaries
 

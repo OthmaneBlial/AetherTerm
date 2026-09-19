@@ -50,7 +50,7 @@ The agent reconnects automatically after a temporary server outage with bounded 
 
 ## Intended product
 
-The proposed first release is a self-hosted console for one operator and multiple explicitly enrolled Linux agents. Browser sign-in, per-browser session ownership and device credentials have local integration tests. Verified HTTPS/WSS for remote access is still required. The intended scope and trust boundaries are in [the product contract](docs/PRODUCT.md) and [the threat model](docs/THREAT_MODEL.md). Those documents describe the complete release contract, not a claim that it has been delivered.
+The proposed first release is a self-hosted console for one operator and multiple explicitly enrolled Linux agents. Browser sign-in, per-browser session ownership and device credentials have integration tests. Verified HTTPS/WSS for remote access is still required. The [architecture](docs/ARCHITECTURE.md), [product contract](docs/PRODUCT.md) and [threat model](docs/THREAT_MODEL.md) describe how the current code works and what the release must still prove.
 
 AetherTerm does not speak SSH. Compatibility, security and ease-of-use comparisons with other projects have not been measured yet. The [roadmap](ROADMAP.md) defines the work and evidence required before a release and before a real product demonstration video.
 
@@ -58,10 +58,10 @@ AetherTerm does not speak SSH. Compatibility, security and ease-of-use compariso
 
 | Area | Current evidence | Release requirement |
 | --- | --- | --- |
-| Shell relay | Two independent local PTYs, explicit close, browser disconnect and agent SIGTERM have integration tests on macOS. Chrome manually showed Unicode, ANSI colors, `less`, Ctrl+C and resize. | Linux validation, remaining terminal interactions and further interruption tests. |
-| Browser access | Password login, cookie session, same-origin WebSocket and negative cross-browser integration test. | Full device authorization, expiry/revocation and deployment validation. |
+| Shell relay | Two independent PTYs, explicit close, browser disconnect, agent SIGTERM/SIGINT and server restart have integration tests on macOS and passed on a Linux CI runner. Chrome manually showed Unicode, ANSI colors, `less`, Ctrl+C and resize. | Remaining graphical terminal interactions and real deployment validation. |
+| Browser access | Password login, cookie session, same-origin WebSocket and negative cross-browser integration test. The sole operator can access every enrolled active device. | Expiry/revocation under load, external deployment and independent security review. |
 | Agent identity | Per-device credential-file enrollment, rotation and revocation tested locally. | Remote encrypted transport, Linux installation and operating guidance. |
 | Transport | Remote cleartext refused in code; direct TLS and a local Caddy HTTPS/WSS proxy test with certificate validation passed. | Public certificate, external network and graphical browser validation. |
-| Packaging and automation | A local wheel installed in a clean macOS Python 3.13 venv served its bundled UI and completed a real authorized PTY round trip; local `unittest` integration tests exist. No CI or published release artifacts are verified. | Linux and other declared environments, automated gates and tested downloads. |
+| Packaging and automation | A wheel installed in clean Python 3.13 environments served its bundled UI and completed an authorized PTY round trip on macOS and an Ubuntu 24.04 CI runner. The [CI run for `f0b1cdd`](https://github.com/OthmaneBlial/AetherTerm/actions/runs/35444767496) passed. No published release artifact is verified. | Browser automation, security scans, tested downloads and release checks. |
 
 The MIT license is in [LICENSE](LICENSE). Contributions are welcome once the security and test setup are documented; please avoid deploying this revision to a reachable network. The complete sequence is tracked in [ROADMAP.md](ROADMAP.md).

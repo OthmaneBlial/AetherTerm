@@ -6,7 +6,7 @@ Checked on 2026-09-19. This is a comparison of documented capabilities, **not** 
 
 > Give one operator a private browser console for explicitly enrolled Linux agents, without having to expose each agent's shell endpoint to the browser.
 
-This is a hypothesis. The current AetherTerm prototype is unsafe on an untrusted network and does not yet provide a full terminal. It has no verified setup advantage, remote-network behavior or adoption evidence. Agent-initiated connections might simplify some topologies, but NAT/firewall behavior must be measured before making that claim.
+This is a hypothesis. AetherTerm now has local operator sign-in, device credentials and a bundled terminal, but its external remote-network path, full terminal interaction set and release artifacts are not yet validated. It has no verified setup advantage or adoption evidence. Agent-initiated connections might simplify some topologies, but NAT/firewall behavior must be measured before making that claim.
 
 ## Documented landscape
 
@@ -15,7 +15,7 @@ This is a hypothesis. The current AetherTerm prototype is unsafe on an untrusted
 | [ttyd](https://github.com/tsl0922/ttyd/blob/main/README.md) | Serves a command's terminal over the Web; documents Basic authentication, an authentication-proxy header option, origin checking and TLS flags. | Documents CJK/IME, static binaries and multiple installation methods. | A second-agent scenario, secure first setup and recovery with fewer measured steps. Do not claim a simpler or more secure ttyd replacement. |
 | [WeTTY](https://github.com/butlerx/wetty/blob/main/README.md) | Browser terminal using SSH or local login; documents remote SSH host options and HTTPS/proxy deployment. | Documents xterm.js, npm and Docker installation. | Show where an enrolled outbound agent helps compared with an SSH-based workflow, with the same network and credential constraints. |
 | [Apache Guacamole](https://guacamole.apache.org/doc/gug/introduction.html) | Browser gateway for SSH, RDP and VNC. Its [SSH configuration guide](https://guacamole.apache.org/doc/gug/configuring-guacamole.html) documents connection and access settings. | Browser access without client-side plugins; broader remote-desktop scope than this project's v1. | Compare only the Linux terminal journey, not Guacamole's wider desktop feature set, and quantify setup/maintenance cost rather than asserting it. |
-| AetherTerm at `98377ad` | Python server with agent-initiated WebSocket and browser WebSocket. Browser is currently unauthenticated; the agent token is public in source. | Text display plus line input; no release artifact or complete terminal emulator. | Implement phases 1–6, then run the same tasks on release artifacts. |
+| AetherTerm at `f0b1cdd` | Python server with operator sign-in, enrolled outbound WebSocket agents and browser-owned PTY sessions; local Caddy TLS path checked. | Bundled xterm.js interface; wheel and real PTY tested on macOS and an Ubuntu 24.04 CI runner. No published release artifact or full graphical terminal matrix yet. | Finish security, deployment and release gates, then run the same tasks on published artifacts. |
 
 The project should avoid a generic “SSH replacement” claim: AetherTerm does not implement SSH, while WeTTY and Guacamole explicitly use it. An honest differentiator may be a narrowly scoped, auditable single-operator agent model, but this remains unproven.
 
