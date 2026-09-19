@@ -1,9 +1,9 @@
 name: Release
 
 on:
-  push:
-    tags:
-      - "v*"
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
 
 permissions:
   contents: write
@@ -11,13 +11,27 @@ permissions:
 jobs:
   publish:
     name: Build and publish release assets
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      startsWith(github.event.workflow_run.head_branch, 'v') &&
+      github.event.workflow_run.head_repository.full_name == github.repository
     runs-on: ubuntu-24.04
     timeout-minutes: 25
+    env:
+      CI_SHA: ${{ github.event.workflow_run.head_sha }}
+      RELEASE_TAG: ${{ github.event.workflow_run.head_branch }}
     steps:
       - name: Check out tagged source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
+          ref: ${{ github.event.workflow_run.head_sha }}
           fetch-depth: 0
+
+      - name: Verify that the completed CI run belongs to the release tag
+        run: |
+          git fetch --force origin "refs/tags/$RELEASE_TAG:refs/tags/$RELEASE_TAG"
+          test "$(git rev-parse "$RELEASE_TAG^{commit}")" = "$CI_SHA"
+          echo "Release tag $RELEASE_TAG points to $CI_SHA"
 
       - name: Set up Python 3.13
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
@@ -32,8 +46,8 @@ jobs:
 
       - name: Require the tag and package versions to match
         run: |
+          tag_version="${RELEASE_TAG#v}"
           package_version=$(python -c 'import importlib.metadata; print(importlib.metadata.version("aetherterm"))')
-          tag_version="${GITHUB_REF_NAME#v}"
           test "$tag_version" = "$package_version"
 
       - name: Build Python distributions
@@ -47,13 +61,13 @@ jobs:
             --specpath "$RUNNER_TEMP/aetherterm-pyi-spec" \
             --workpath "$RUNNER_TEMP/aetherterm-pyi-build" \
             --distpath artifacts/bin scripts/frozen_agent.py
-          mv artifacts/bin/aetherterm-agent "artifacts/bin/aetherterm-agent-${GITHUB_REF_NAME#v}-linux-x86_64"
+          mv artifacts/bin/aetherterm-agent "artifacts/bin/aetherterm-agent-${RELEASE_TAG#v}-linux-x86_64"
 
       - name: Assemble and hash release assets
         run: |
           mkdir -p release
           cp dist/*.whl dist/*.tar.gz release/
-          cp "artifacts/bin/aetherterm-agent-${GITHUB_REF_NAME#v}-linux-x86_64" release/
+          cp "artifacts/bin/aetherterm-agent-${RELEASE_TAG#v}-linux-x86_64" release/
           (cd release && sha256sum ./* > SHA256SUMS)
           sha256sum --check release/SHA256SUMS
 
@@ -61,7 +75,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" release/* \
+          gh release create "$RELEASE_TAG" release/* \
             --verify-tag \
-            --title "AetherTerm $GITHUB_REF_NAME" \
+            --title "AetherTerm $RELEASE_TAG" \
             --generate-notes
