@@ -10,13 +10,11 @@ import stat
 import ipaddress
 import ssl
 import signal
+from websockets.typing import Subprotocol
 
-WEBSOCKET_SUBPROTOCOL = "aetherterm.v1"
+from client.sessions import PtySession
 
-if __package__:
-    from .sessions import PtySession
-else:
-    from sessions import PtySession
+WEBSOCKET_SUBPROTOCOL = Subprotocol("aetherterm.v1")
 
 
 def read_token_file(path: Path) -> str:
@@ -105,27 +103,27 @@ async def connect(host, port, device_id, token, description, *, tls=False, ca_fi
                             session_id = msg['sessionId']
                             if session_id in sessions:
                                 continue
-                            session = PtySession(session_id, send, session_exited)
-                            sessions[session_id] = session
+                            new_session = PtySession(session_id, send, session_exited)
+                            sessions[session_id] = new_session
                             try:
-                                session.start()
+                                new_session.start()
                             except OSError:
                                 sessions.pop(session_id, None)
                                 await send({"type": "session_exit", "sessionId": session_id})
                                 continue
                             await send({"type": "session_ready", "sessionId": session_id})
                         elif msg['type'] == 'close_session':
-                            session = sessions.pop(msg['sessionId'], None)
-                            if session is not None:
-                                await session.close()
+                            to_close = sessions.pop(msg['sessionId'], None)
+                            if to_close is not None:
+                                await to_close.close()
                         elif msg['type'] == 'term_data':
-                            session = sessions.get(msg['sessionId'])
-                            if session is not None:
-                                session.write(base64.b64decode(msg['data'], validate=True))
+                            active_session = sessions.get(msg['sessionId'])
+                            if active_session is not None:
+                                active_session.write(base64.b64decode(msg['data'], validate=True))
                         elif msg['type'] == 'resize':
-                            session = sessions.get(msg['sessionId'])
-                            if session is not None:
-                                session.resize(msg['cols'], msg['rows'])
+                            active_session = sessions.get(msg['sessionId'])
+                            if active_session is not None:
+                                active_session.resize(msg['cols'], msg['rows'])
                         elif msg['type'] == 'heartbeat_ack':
                             pass  # handle heartbeat
                 except websockets.exceptions.ConnectionClosed as exc:
@@ -168,6 +166,8 @@ def main():
         parser.error(str(exc))
     async def run_agent():
         task = asyncio.current_task()
+        if task is None:
+            raise RuntimeError("Agent event loop has no current task")
         asyncio.get_running_loop().add_signal_handler(signal.SIGTERM, task.cancel)
         await connect(args.host, args.port, args.device_id, token, args.description, tls=args.tls, ca_file=args.ca_file)
 

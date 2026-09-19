@@ -37,7 +37,9 @@ class PtySession:
         try:
             while not self.closed:
                 fd = self.fd
-                readable, _, _ = await asyncio.to_thread(select.select, [fd], [], [], 0.1)
+                if fd is None:
+                    break
+                readable, _, _ = await asyncio.to_thread(lambda: select.select([fd], [], [], 0.1))
                 if not readable or self.closed:
                     continue
                 try:

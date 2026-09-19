@@ -189,9 +189,9 @@ async def sign_in(request: Request):
         body.extend(chunk)
     password = parse_qs(body.decode("utf-8", errors="replace")).get("password", [""])[0]
     if not state.operator_auth.verify_password(password):
-        response = login_page(state, "invalid")
-        response.status_code = 401
-        return response
+        failure_response = login_page(state, "invalid")
+        failure_response.status_code = 401
+        return failure_response
     token = state.operator_auth.create_session()
     response = RedirectResponse("/web/", status_code=303)
     response.set_cookie(
@@ -401,7 +401,7 @@ async def client_websocket(websocket: WebSocket):
 
     try:
         while True:
-            if device_id and not agent_registry.is_active(device_id, token_hash):
+            if device_id is not None and (token_hash is None or not agent_registry.is_active(device_id, token_hash)):
                 await websocket.close(code=1008, reason="Device revoked or credential rotated")
                 break
             try:
@@ -411,7 +411,7 @@ async def client_websocket(websocket: WebSocket):
                     continue
                 await websocket.close(code=1008, reason="Registration required")
                 break
-            if device_id and not agent_registry.is_active(device_id, token_hash):
+            if device_id is not None and (token_hash is None or not agent_registry.is_active(device_id, token_hash)):
                 await websocket.close(code=1008, reason="Device revoked or credential rotated")
                 break
             if not message_rate.allow("agent"):
