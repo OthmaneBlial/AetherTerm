@@ -35,8 +35,7 @@ def request(port, method, path, *, body=None, headers=None):
     connection = http.client.HTTPConnection("127.0.0.1", port, timeout=3)
     connection.request(method, path, body=body, headers=headers or {})
     response = connection.getresponse()
-    result = response.status, dict(response.getheaders())
-    response.read()
+    result = response.status, dict(response.getheaders()), response.read()
     connection.close()
     return result
 
@@ -88,13 +87,21 @@ async def main():
                 env={**os.environ, "PYTHONUNBUFFERED": "1"},
             )
             origin = f"http://127.0.0.1:{port}"
-            status, headers = request(port, "POST", "/login", body="password=temporary-container-password",
-                                      headers={"Origin": origin})
+            status, headers, _ = request(port, "POST", "/login", body="password=temporary-container-password",
+                                         headers={"Origin": origin})
             if status != 303:
                 raise AssertionError(f"Container login returned {status}")
             cookie = headers["set-cookie"].split(";", 1)[0]
             if not cookie.startswith(COOKIE_NAME + "="):
                 raise AssertionError("Operator cookie missing")
+            for path, marker in (("/web/", b"assets/app.js"),
+                                 ("/web/assets/app.js", b"Terminal"),
+                                 ("/web/assets/app.css", b".terminal"),
+                                 ("/favicon.svg", b"<svg"),
+                                 ("/favicon.ico", b"\x00\x00\x01\x00")):
+                asset_status, _, content = request(port, "GET", path, headers={"Cookie": cookie})
+                if asset_status != 200 or marker not in content:
+                    raise AssertionError(f"Container asset {path} unavailable: {asset_status}")
             async with websockets.connect(f"ws://127.0.0.1:{port}/ws", origin=origin,
                                           additional_headers={"Cookie": cookie},
                                           subprotocols=[WEBSOCKET_SUBPROTOCOL]) as browser:

@@ -73,6 +73,16 @@ async def main():
                 browser = await playwright.chromium.launch(headless=True)
                 page = await browser.new_page(viewport={"width": 1280, "height": 800})
                 errors = []
+                external_requests = []
+
+                async def require_local_asset(route):
+                    if not route.request.url.startswith(f"http://127.0.0.1:{port}/"):
+                        external_requests.append(route.request.url)
+                        await route.abort()
+                    else:
+                        await route.continue_()
+
+                await page.route("**/*", require_local_asset)
                 page.on("pageerror", lambda error: errors.append(str(error)))
                 page.on("console", lambda message: errors.append(message.text) if message.type == "error" else None)
                 try:
@@ -88,6 +98,7 @@ async def main():
                     await page.keyboard.type("printf 'BROWSER_OK\\n'")
                     await page.keyboard.press("Enter")
                     await page.get_by_text("BROWSER_OK", exact=True).wait_for(state="attached", timeout=10000)
+                    assert not external_requests, f"Web UI requested external assets: {external_requests}"
                     assert not errors, f"Browser console errors before restart: {errors}"
 
                     stop(server)
