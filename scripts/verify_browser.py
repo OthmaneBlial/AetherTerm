@@ -244,23 +244,25 @@ async def main():
                         screenshots = Path(screenshot_dir)
                         screenshots.mkdir(parents=True, exist_ok=True)
                         await page.screenshot(path=str(screenshots / "desktop.png"), full_page=True)
-                    await page.set_viewport_size({"width": 375, "height": 812})
-                    for _ in range(50):
-                        widths = await page.evaluate("""() => ({
-                          viewport: window.innerWidth,
-                          document: document.documentElement.scrollWidth,
-                          overflowing: [...document.querySelectorAll('*')]
-                            .filter(element => element.getBoundingClientRect().right > window.innerWidth + 1)
-                            .slice(0, 8).map(element => ({tag: element.tagName, className: String(element.className),
-                                                          right: element.getBoundingClientRect().right}))
-                        })""")
-                        if widths["document"] <= widths["viewport"]:
-                            break
-                        await asyncio.sleep(0.1)
-                    else:
-                        raise AssertionError(f"Mobile horizontal overflow: {widths}")
-                    if screenshot_dir:
-                        await page.screenshot(path=str(screenshots / "mobile.png"), full_page=True)
+                    overflow_widths = (320, 375, 390, 768, 1280)
+                    for viewport_width in overflow_widths:
+                        await page.set_viewport_size({"width": viewport_width, "height": 812})
+                        for _ in range(50):
+                            widths = await page.evaluate("""() => ({
+                              viewport: window.innerWidth,
+                              document: document.documentElement.scrollWidth,
+                              overflowing: [...document.querySelectorAll('*')]
+                                .filter(element => element.getBoundingClientRect().right > window.innerWidth + 1)
+                                .slice(0, 8).map(element => ({tag: element.tagName, className: String(element.className),
+                                                              right: element.getBoundingClientRect().right}))
+                            })""")
+                            if widths["document"] <= widths["viewport"]:
+                                break
+                            await asyncio.sleep(0.1)
+                        else:
+                            raise AssertionError(f"Horizontal overflow at {viewport_width}px: {widths}")
+                        if viewport_width == 375 and screenshot_dir:
+                            await page.screenshot(path=str(screenshots / "mobile.png"), full_page=True)
                     await page.set_viewport_size({"width": 1280, "height": 800})
                     await page.locator(".xterm-helper-textarea").focus()
                     await page.keyboard.type("cat")
