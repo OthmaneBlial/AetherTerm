@@ -64,11 +64,11 @@ Une case est cochée seulement après satisfaction de **tous** les critères d'a
 - [ ] 3.3 Assets Web maîtrisés et identité visuelle — xterm.js 6.0.0 et FitAddon 0.11.0 figés, build local et licences incluses ; favicon et CSP vérifiés avec connexion, PTY et déconnexion dans Chrome ; wheel installé en venv macOS propre avec assets servis localement et PTY réel ; image et essai hors ligne explicite encore requis.
 - [ ] 4.1 Architecture et configuration testables — factory FastAPI, état par instance et événements d'audit JSON bornés testés ; configuration typée complète et protocole versionné encore requis.
 - [ ] 4.2 Suite de tests utile.
-- [ ] 4.3 Dépendances et maintenance vérifiables — manifeste Python et dépendances directes figées ; résolution transitive, matrice Python/OS, lint, scans et CI encore requis.
+- [ ] 4.3 Dépendances et maintenance vérifiables — manifeste Python et dépendances directes figées ; scans Python du venv installé et npm exécutés localement sans avis connu après mise à jour du `pip` de test ; CI de scan en attente, résolution transitive, matrice élargie et lint encore requis.
 - [ ] 5.1 Installation et déploiement reproductibles.
 - [ ] 5.2 Documentation architecture, sécurité et opérations.
 - [ ] 5.3 README et captures réelles.
-- [ ] 6.1 CI bloquante — run [35444767496](https://github.com/OthmaneBlial/AetherTerm/actions/runs/35444767496) vert sur `f0b1cdd` avec actions figées (Linux Python 3.13, PTY réel, wheel installé, assets Web) ; tests navigateur, scans et politique de blocage PR encore requis.
+- [ ] 6.1 CI bloquante — run [35444767496](https://github.com/OthmaneBlial/AetherTerm/actions/runs/35444767496) vert sur `f0b1cdd` avec actions figées (Linux Python 3.13, PTY réel, wheel installé, assets Web) ; scans ajoutés mais non encore validés en CI, tests navigateur et politique de blocage PR encore requis.
 - [ ] 6.2 Artefacts téléchargeables/installables — wheel local installé et testé sur macOS 3.13 ; conteneur, binaire Linux, installation Linux et téléchargements publiés encore requis.
 - [ ] 6.3 Contributions et présentation GitHub.
 - [ ] 6.4 Première release vérifiée.

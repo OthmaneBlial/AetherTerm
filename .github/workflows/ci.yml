@@ -28,10 +28,15 @@ jobs:
       - name: Check installed wheel outside checkout
         run: |
           python -m venv "$RUNNER_TEMP/aetherterm-wheel"
+          "$RUNNER_TEMP/aetherterm-wheel/bin/python" -m pip install --upgrade pip==26.2.1
           "$RUNNER_TEMP/aetherterm-wheel/bin/python" -m pip install dist/*.whl
           "$RUNNER_TEMP/aetherterm-wheel/bin/python" -m pip check
           cd "$RUNNER_TEMP"
           "$RUNNER_TEMP/aetherterm-wheel/bin/python" "$GITHUB_WORKSPACE/scripts/verify_installed_wheel.py"
+      - name: Audit installed Python dependencies
+        run: |
+          python -m pip install pip-audit==2.10.1
+          pip-audit --path "$RUNNER_TEMP/aetherterm-wheel/lib/python3.13/site-packages" --progress-spinner off
 
   web-assets:
     runs-on: ubuntu-24.04
@@ -49,5 +54,6 @@ jobs:
           npm ci
           npm run check
           npm run build
+          npm audit --audit-level=high
       - name: Check committed assets match source
         run: git diff --exit-code -- web/assets
