@@ -11,6 +11,7 @@ const tabsElement = document.getElementById('session-tabs')
 const terminalsElement = document.getElementById('terminals')
 const emptyElement = document.getElementById('terminal-empty')
 const closeButton = document.getElementById('close-session')
+const interruptButton = document.getElementById('interrupt-session')
 const terminalState = document.getElementById('terminal-state')
 const encoder = new TextEncoder()
 
@@ -54,10 +55,11 @@ function decodedBytes(value) {
 
 function sendTerminalBytes(sessionId, bytes) {
   const session = sessions.get(sessionId)
-  if (!session?.ready || !online) return
+  if (!session?.ready || !online) return false
   for (let offset = 0; offset < bytes.length; offset += 16384) {
-    send({ type: 'term_input', sessionId, input: encodedBytes(bytes.subarray(offset, offset + 16384)) })
+    if (!send({ type: 'term_input', sessionId, input: encodedBytes(bytes.subarray(offset, offset + 16384)) })) return false
   }
+  return true
 }
 
 function renderDevices(deviceDetails) {
@@ -125,6 +127,7 @@ function activateSession(sessionId) {
   emptyElement.hidden = Boolean(sessionId)
   closeButton.disabled = !sessionId || !online
   const session = sessions.get(sessionId)
+  interruptButton.disabled = !session?.ready || !online
   terminalState.textContent = session ? `${session.deviceId.toUpperCase()} · ${session.ready ? 'SHELL READY' : 'STARTING SHELL'}` : 'NO ACTIVE SESSION'
   if (session) requestAnimationFrame(() => { fitSession(session); session.terminal.focus() })
 }
@@ -198,7 +201,10 @@ function handleMessage(event) {
     session.ready = true
     session.tab.classList.add('ready')
     fitSession(session)
-    if (activeSessionId === session.id) terminalState.textContent = `${session.deviceId.toUpperCase()} · SHELL READY`
+    if (activeSessionId === session.id) {
+      terminalState.textContent = `${session.deviceId.toUpperCase()} · SHELL READY`
+      interruptButton.disabled = false
+    }
     setNotice(`Shell ready on ${session.deviceId}. Type directly in the terminal.`, 'success')
   } else if (message.type === 'term_data') {
     const session = sessions.get(message.sessionId)
@@ -258,6 +264,13 @@ document.getElementById('refresh-devices').addEventListener('click', () => {
 })
 closeButton.addEventListener('click', () => {
   if (activeSessionId) send({ type: 'close_session', sessionId: activeSessionId })
+})
+interruptButton.addEventListener('click', () => {
+  if (!activeSessionId || interruptButton.disabled) return
+  const sent = sendTerminalBytes(activeSessionId, Uint8Array.of(3))
+  sessions.get(activeSessionId)?.terminal.focus()
+  setNotice(sent ? 'Sent Ctrl+C to the active shell.' : 'The server is offline. Wait for reconnection.',
+    sent ? 'neutral' : 'error')
 })
 new ResizeObserver(() => {
   const session = sessions.get(activeSessionId)

@@ -101,6 +101,7 @@ h1, h2, p { margin-top: 0; }
 .session-tab.ready::before { content: '●'; color: var(--mint); font-size: 7px; margin-right: 8px; vertical-align: 2px; }
 .close-button { align-self: center; margin: 6px 10px 6px 0; padding: 8px 10px; border: 1px solid #526065; background: transparent; color: var(--muted); cursor: pointer; font-size: 10px; white-space: nowrap; }
 .close-button:hover:not(:disabled) { color: var(--text); border-color: var(--text); }
+.interrupt-button { margin-right: 0; }
 .terminal-empty { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; padding: clamp(30px, 7vw, 88px); background: radial-gradient(circle at 75% 30%, #24403855 0, transparent 35%); }
 .terminal-empty[hidden] { display: none; }
 .empty-glyph { color: var(--amber); border: 1px solid #606b59; padding: 13px 15px; margin-bottom: 28px; font-size: 24px; letter-spacing: -.12em; }

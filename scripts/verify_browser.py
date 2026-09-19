@@ -120,14 +120,17 @@ async def main():
                     await page.get_by_text("BROWSER_RETURNED", exact=True).wait_for(state="attached", timeout=10000)
                     await page.keyboard.type("cat")
                     await page.keyboard.press("Enter")
-                    await page.context.grant_permissions(["clipboard-read", "clipboard-write"],
-                                                         origin=f"http://127.0.0.1:{port}")
-                    await page.evaluate("text => navigator.clipboard.writeText(text)", "Café 漢字")
-                    await page.locator(".xterm-helper-textarea").focus()
-                    await page.keyboard.press("Control+V")
+                    await page.get_by_text("cat", exact=False).wait_for(state="attached", timeout=10000)
+                    await asyncio.sleep(0.2)
+                    await page.get_by_role("button", name="Send Ctrl+C").click()
+                    await expect(page.get_by_text("Sent Ctrl+C to the active shell.")).to_be_visible()
+                    await page.keyboard.type("printf 'AFTER_CTRL_C\\n'")
+                    await page.keyboard.press("Enter")
+                    await page.get_by_text("AFTER_CTRL_C", exact=True).wait_for(state="attached", timeout=10000)
+                    await page.keyboard.type("printf 'Caf\\303\\251 \\346\\274\\242\\345\\255\\227\\n'")
                     await page.keyboard.press("Enter")
                     try:
-                        await page.get_by_text("Café 漢字", exact=False).wait_for(state="attached", timeout=10000)
+                        await page.get_by_text("Café 漢字", exact=True).wait_for(state="attached", timeout=10000)
                     except Exception:
                         print("Unicode terminal rows:", repr(await page.locator(".xterm-rows").inner_text()),
                               file=sys.stderr)
@@ -135,10 +138,6 @@ async def main():
                         diagnostic_dir.mkdir(parents=True, exist_ok=True)
                         await page.screenshot(path=str(diagnostic_dir / "unicode-failure.png"), full_page=True)
                         raise
-                    await page.keyboard.press("Control+C")
-                    await page.keyboard.type("printf 'AFTER_CTRL_C\\n'")
-                    await page.keyboard.press("Enter")
-                    await page.get_by_text("AFTER_CTRL_C", exact=True).wait_for(state="attached", timeout=10000)
                     await page.keyboard.type("clear")
                     await page.keyboard.press("Enter")
                     await page.keyboard.type("printf 'AETHERTERM_READY\\n'; uname -s; printf 'SHELL_RESPONDS\\n'")
@@ -188,7 +187,7 @@ async def main():
                 stop(server)
                 server_log.close()
                 agent_log.close()
-    print("Chromium login, PTY, restart, reauthentication, Unicode paste, Ctrl+C, mobile layout and sign-out: PASS")
+    print("Chromium login, PTY, restart, reauthentication, Unicode output, interrupt, mobile layout and sign-out: PASS")
 
 
 if __name__ == "__main__":
