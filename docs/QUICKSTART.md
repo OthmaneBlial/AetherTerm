@@ -2,6 +2,8 @@
 
 This guide runs one server and one agent on the **same machine**. It is a loopback demonstration, not an Internet deployment. AetherTerm currently targets Python 3.13 and a POSIX shell. The installed wheel has completed an automated real-PTY smoke check on Ubuntu 24.04 and macOS; a fresh human-led Linux installation still needs review before release.
 
+For a disposable first look from a checkout, create a Python 3.13 venv, install this project with `python -m pip install .`, then run `python -m scripts.demo_local`. It starts a real server and agent on a random loopback port, waits for the agent to register, and prints the local URL and a one-time operator password. Select **demo-agent** to open a real shell under your OS account. Press Ctrl+C in the launching terminal to stop both processes and delete the temporary identities. The demo does not modify your normal AetherTerm configuration. The Linux CI runs `python -m scripts.demo_local --check` to verify setup and cleanup without printing the password.
+
 ## 1. Install and create private identities
 
 From a checkout of this repository:

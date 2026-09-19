@@ -27,6 +27,8 @@ jobs:
         run: python scripts/check_docs.py
       - name: Run protocol, security and real PTY tests
         run: python -m unittest discover -s tests -q
+      - name: Check disposable local demo setup and cleanup
+        run: python -m scripts.demo_local --check
       - name: Build wheel and source archive
         run: python -m build --wheel --sdist
       - name: Check installed wheel outside checkout
