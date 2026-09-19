@@ -20,7 +20,7 @@ python -m pip check
 
 The three entry points are `aetherterm-admin`, `aetherterm-server` and `aetherterm-agent`. The CI installs the built wheel in a **separate clean virtual environment outside the checkout** and completes an authenticated server–agent–PTY round trip. The wheel requires Python; the separate Linux agent binary is described below. The version and filename here must be updated when the package version changes.
 
-The `python-distributions` artifact in [run 35447341504](https://github.com/OthmaneBlial/AetherTerm/actions/runs/35447341504) contains the wheel, source archive and `SHA256SUMS`, retained for seven days. That artifact was downloaded to a separate temporary directory on macOS, both checksums matched, and the downloaded wheel was installed into a fresh Python 3.13 venv outside the checkout. `pip check` and an authenticated server–agent–real-PTY round trip passed. This verifies that particular CI download, not a permanent public release asset.
+The `python-distributions` artifact in [run 35452256389](https://github.com/OthmaneBlial/AetherTerm/actions/runs/35452256389) contains the wheel, source archive and `SHA256SUMS`, retained for seven days. That artifact was downloaded to a separate temporary directory, both checksums matched, and the downloaded wheel was installed into a fresh Python 3.13 venv outside the checkout. The installed package reported version `0.1.0a0`. This verifies that particular CI download, not a permanent public release asset.
 
 ## Linux x86_64 agent binary in CI
 
@@ -28,7 +28,7 @@ The [`linux-agent-binary` CI job](../.github/workflows/ci.yml) also builds a PyI
 
 The `linux-agent-x86_64` workflow artifact contains the binary and `SHA256SUMS` for seven days. It is a CI artifact, **not a GitHub Release download**. After obtaining the artifact from that run, verify it in its extracted directory before first use:
 
-The artifact from [run 35448920673](https://github.com/OthmaneBlial/AetherTerm/actions/runs/35448920673) was also downloaded to a temporary macOS directory with `gh run download`. Its `SHA256SUMS` check passed; the binary is a 24 MiB Linux x86_64 ELF with SHA-256 `cfa1519e30fea83bc03783e5f23466955a2598118eadb11b1ed9812c225f141a`. macOS cannot execute that ELF; the Linux CI job supplies the real PTY execution evidence. This check does not establish a permanent public download.
+The artifact from [run 35452256389](https://github.com/OthmaneBlial/AetherTerm/actions/runs/35452256389) was downloaded to a temporary directory with `gh run download`. Its `SHA256SUMS` check passed; the binary identifies as an ELF Linux x86-64 executable. macOS cannot execute that ELF; the Linux CI job supplies the real PTY execution evidence. This check does not establish a permanent public download.
 
 ```bash
 sha256sum --check SHA256SUMS
