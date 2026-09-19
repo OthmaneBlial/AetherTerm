@@ -343,7 +343,13 @@ class BrowserAuthTests(unittest.IsolatedAsyncioTestCase):
                 self.assertIn(b"\xc3\xa9", received)
                 self.assertTrue(any(b"\xc3" in chunk and b"\xa9" not in chunk for chunk in chunks))
                 await first.send(json.dumps({"type": "close_session", "sessionId": first_id}))
-                self.assertEqual(json.loads(await first.recv())["type"], "session_closed")
+                for _ in range(40):
+                    message = json.loads(await asyncio.wait_for(first.recv(), 2))
+                    if message["type"] == "session_closed" and message["sessionId"] == first_id:
+                        break
+                    self.assertEqual(message["type"], "term_data")
+                else:
+                    self.fail("No session_closed event after explicit close")
                 for _ in range(30):
                     try:
                         os.kill(first_pid, 0)
