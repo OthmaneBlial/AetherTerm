@@ -104,6 +104,7 @@ def main():
             port = listener.getsockname()[1]
         server_log = (directory / "server.log").open("w+", encoding="utf-8")
         agent_log = (directory / "agent.log").open("w+", encoding="utf-8")
+        agent_executable = os.environ.get("AETHERTERM_AGENT_BINARY", str(executable_dir / "aetherterm-agent"))
         server = agent = None
         try:
             server = subprocess.Popen([str(executable_dir / "aetherterm-server"), "--port", str(port)],
@@ -117,7 +118,7 @@ def main():
                     time.sleep(0.1)
             else:
                 raise AssertionError("Installed server did not start")
-            agent = subprocess.Popen([str(executable_dir / "aetherterm-agent"), "--host", "127.0.0.1",
+            agent = subprocess.Popen([agent_executable, "--host", "127.0.0.1",
                                       "--port", str(port), "--device-id", "wheel-agent",
                                       "--token-file", str(credential)], cwd=directory, env=environment,
                                      stdout=agent_log, stderr=subprocess.STDOUT, start_new_session=True)
