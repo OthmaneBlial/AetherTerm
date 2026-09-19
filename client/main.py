@@ -22,18 +22,8 @@ async def connect(host, port, device_id, token, description):
                 response = await websocket.recv()
                 msg = json.loads(response)
                 if msg['type'] == 'registered':
-                    print("\n" + "="*50)
-                    print("🔒 AETHERTERM CLIENT - SECURE CONNECTION ESTABLISHED")
-                    print("="*50)
-                    print("🛡️  SECURITY VERIFICATION:")
-                    print("   ✅ Authentication token validated")
-                    print("   ✅ Server connection encrypted (WebSocket)")
-                    print("   ✅ Device ID registered successfully")
-                    print("   ✅ Terminal session secured")
-                    print("   ✅ All communications monitored")
-                    print("="*50)
-                    print("🚀 Ready for secure remote terminal access!")
-                    print("="*50 + "\n")
+                    print("Agent registered with the AetherTerm prototype.")
+                    print("Browser access is unauthenticated; use loopback only.")
                 else:
                     print("❌ Registration failed - Invalid token or server error")
                     return

@@ -191,24 +191,7 @@
             "ws://localhost:8001/ws"
           )
           this.ws.onopen = () => {
-            console.log(
-              "🔒 Secure WebSocket connection established"
-            )
-            console.log(
-              "🛡️  Connection protected by:"
-            )
-            console.log(
-              "   ✅ Server-side authentication"
-            )
-            console.log(
-              "   ✅ Rate limiting active"
-            )
-            console.log(
-              "   ✅ Session validation"
-            )
-            console.log(
-              "   ✅ Encrypted WebSocket communication"
-            )
+            console.log("Connected to the AetherTerm prototype; browser access is unauthenticated")
           }
           this.ws.onmessage =
             this.onMessage.bind(this)

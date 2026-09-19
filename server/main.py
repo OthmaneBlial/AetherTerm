@@ -60,21 +60,7 @@ if os.path.exists(web_dir):
 else:
     print("Web directory not found!")
 
-# Security startup banner
-print("\n" + "="*60)
-print("🔒 AETHERTERM SERVER - SECURE REMOTE TERMINAL")
-print("="*60)
-print("🛡️  SECURITY FEATURES ACTIVE:")
-print("   ✅ Token-based authentication")
-print("   ✅ Rate limiting (10/min, 50/hour per IP)")
-print("   ✅ IP-based connection monitoring")
-print("   ✅ Session validation & logging")
-print("   ✅ WebSocket encryption ready")
-print("   ✅ TLS/SSL certificate support")
-print(f"   ✅ {len(ALLOWED_TOKENS)} authorized tokens configured")
-print("="*60)
-print("🚀 Server ready for secure connections!")
-print("="*60 + "\n")
+print("AetherTerm prototype: browser access is unauthenticated; bind to loopback only.")
 
 devices = {}  # device_id: websocket
 sessions = {}  # session_id: {'device_id': str, 'web_ws': WebSocket}
@@ -164,7 +150,7 @@ async def client_websocket(websocket: WebSocket):
 
                 # Security check: Validate token
                 if not validate_token(token):
-                    log_security_event("INVALID_TOKEN", client_ip, f"Device: {device_id}, Token: {token[:8]}...")
+                    log_security_event("INVALID_TOKEN", client_ip, f"Device: {device_id}")
                     await websocket.send_text(json.dumps({"type": "error", "message": "Invalid authentication token"}))
                     await websocket.close(code=1008, reason="Authentication failed")
                     return
@@ -177,7 +163,7 @@ async def client_websocket(websocket: WebSocket):
                     return
 
                 devices[device_id] = websocket
-                log_security_event("CLIENT_REGISTERED", client_ip, f"Device: {device_id}, Token: {token[:8]}...")
+                log_security_event("CLIENT_REGISTERED", client_ip, f"Device: {device_id}")
                 await websocket.send_text(json.dumps({"type": "registered"}))
 
             elif msg['type'] == 'term_data':
