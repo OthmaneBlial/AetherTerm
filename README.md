@@ -52,7 +52,7 @@ AetherTerm does not speak SSH. Compatibility, security and ease-of-use compariso
 
 | Area | Current evidence | Release requirement |
 | --- | --- | --- |
-| Shell relay | Local server/agent WebSocket round trip was exercised during the roadmap audit. | Independent PTYs, cleanup, full terminal interactions and Linux validation. |
+| Shell relay | Two independent local PTYs, explicit close, browser disconnect and agent SIGTERM have integration tests on macOS. | Linux validation, full terminal interactions and further interruption tests. |
 | Browser access | Password login, cookie session, same-origin WebSocket and negative cross-browser integration test. | Full device authorization, expiry/revocation and deployment validation. |
 | Agent identity | Per-device credential-file enrollment, rotation and revocation tested locally. | Remote encrypted transport, Linux installation and operating guidance. |
 | Transport | Remote cleartext refused in code; direct TLS and a local Caddy HTTPS/WSS proxy test with certificate validation passed. | Public certificate, external network and graphical browser validation. |

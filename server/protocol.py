@@ -49,8 +49,8 @@ def parse_message(raw: str, peer: str) -> dict:
     if not isinstance(message, dict):
         raise ProtocolError("Message must be an object")
     kind = message.get("type")
-    browser_types = {"list_devices", "start_session", "term_input", "resize"}
-    agent_types = {"register", "term_data", "heartbeat"}
+    browser_types = {"list_devices", "start_session", "term_input", "resize", "close_session"}
+    agent_types = {"register", "term_data", "heartbeat", "session_ready", "session_exit"}
     allowed = browser_types if peer == "browser" else agent_types if peer == "agent" else set()
     if not isinstance(kind, str) or kind not in allowed:
         raise ProtocolError("Unsupported message type")
@@ -64,7 +64,7 @@ def parse_message(raw: str, peer: str) -> dict:
         description = message.get("description", "")
         if not isinstance(description, str) or len(description) > 120:
             raise ProtocolError("Invalid description")
-    if kind in ("term_input", "term_data", "resize"):
+    if kind in ("term_input", "term_data", "resize", "close_session", "session_ready", "session_exit"):
         _session_id(message.get("sessionId"))
     if kind == "term_input":
         _payload(message.get("input"))

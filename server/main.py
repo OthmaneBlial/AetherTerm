@@ -41,10 +41,30 @@ print("AetherTerm prototype: operator and device credentials are required.")
 
 devices = {}  # device_id: websocket
 device_credentials = {}  # device_id: credential hash for revocation checks
-sessions = {}  # session_id: {'device_id': str, 'web_ws': WebSocket}
+sessions = {}  # session_id: {'device_id': str, 'web_ws': WebSocket, 'ready': bool}
 
 async def send_error(websocket: WebSocket, message: str) -> None:
     await websocket.send_text(json.dumps({"type": "error", "message": message}))
+
+
+async def send_to_browser(session_id: str, message: dict) -> bool:
+    """Drop one stalled browser session without taking down its agent."""
+    session = sessions.get(session_id)
+    if session is None:
+        return False
+    try:
+        await asyncio.wait_for(session['web_ws'].send_text(json.dumps(message)), timeout=3)
+        return True
+    except Exception:
+        sessions.pop(session_id, None)
+        device_socket = devices.get(session['device_id'])
+        if device_socket:
+            try:
+                await asyncio.wait_for(device_socket.send_text(json.dumps(
+                    {"type": "close_session", "sessionId": session_id})), timeout=3)
+            except Exception:
+                pass
+        return False
 
 
 def session_capacity(websocket: WebSocket, device_id: str) -> bool:
@@ -194,9 +214,9 @@ async def web_websocket(websocket: WebSocket):
                     await send_error(websocket, "Session limit reached")
                     continue
                 session_id = str(uuid.uuid4())
-                sessions[session_id] = {'device_id': device_id, 'web_ws': websocket}
-                await devices[device_id].send_text(json.dumps({"type": "login_request", "sessionId": session_id}))
+                sessions[session_id] = {'device_id': device_id, 'web_ws': websocket, 'ready': False}
                 await websocket.send_text(json.dumps({"type": "session_started", "sessionId": session_id}))
+                await devices[device_id].send_text(json.dumps({"type": "login_request", "sessionId": session_id}))
                 log_security_event("SESSION_STARTED", client_ip, f"Session: {session_id}, Device: {device_id}")
             elif msg['type'] == 'term_input':
                 session_id = msg['sessionId']
@@ -205,17 +225,31 @@ async def web_websocket(websocket: WebSocket):
                     log_security_event("INVALID_SESSION", client_ip)
                     await send_error(websocket, "Session unavailable")
                     continue
+                if not sessions[session_id]['ready']:
+                    await send_error(websocket, "Session not ready")
+                    continue
                 device_id = sessions[session_id]['device_id']
                 await devices[device_id].send_text(json.dumps({"type": "term_data", "sessionId": session_id, "data": input_b64}))
             elif msg['type'] == 'resize':
                 session_id = msg['sessionId']
                 cols = msg.get('cols', 80)
                 rows = msg.get('rows', 24)
-                if session_id in sessions and sessions[session_id]['web_ws'] is websocket and active_device(sessions[session_id]['device_id']):
+                if session_id in sessions and sessions[session_id]['web_ws'] is websocket and sessions[session_id]['ready'] and active_device(sessions[session_id]['device_id']):
                     device_id = sessions[session_id]['device_id']
                     await devices[device_id].send_text(json.dumps({"type": "resize", "sessionId": session_id, "cols": cols, "rows": rows}))
                 else:
                     await send_error(websocket, "Session unavailable")
+            elif msg['type'] == 'close_session':
+                session_id = msg['sessionId']
+                session = sessions.get(session_id)
+                if session is None or session['web_ws'] is not websocket:
+                    await send_error(websocket, "Session unavailable")
+                    continue
+                del sessions[session_id]
+                device_socket = devices.get(session['device_id'])
+                if device_socket:
+                    await device_socket.send_text(json.dumps({"type": "close_session", "sessionId": session_id}))
+                await websocket.send_text(json.dumps({"type": "session_closed", "sessionId": session_id}))
     except Exception as e:
         log_security_event("WEB_ERROR", client_ip, str(e))
         print(f"Web WS error: {e}")
@@ -225,7 +259,13 @@ async def web_websocket(websocket: WebSocket):
         # remove sessions for this web_ws
         to_remove = [sid for sid, s in sessions.items() if s['web_ws'] == websocket]
         for sid in to_remove:
-            del sessions[sid]
+            session = sessions.pop(sid)
+            device_socket = devices.get(session['device_id'])
+            if device_socket:
+                try:
+                    await device_socket.send_text(json.dumps({"type": "close_session", "sessionId": sid}))
+                except Exception:
+                    pass
 
 @app.websocket("/client")
 async def client_websocket(websocket: WebSocket):
@@ -307,12 +347,25 @@ async def client_websocket(websocket: WebSocket):
             elif msg['type'] == 'term_data':
                 session_id = msg['sessionId']
                 data_b64 = msg['data']
-                if session_id in sessions and sessions[session_id]['device_id'] == device_id:
-                    web_ws = sessions[session_id]['web_ws']
-                    await web_ws.send_text(json.dumps({"type": "term_data", "sessionId": session_id, "data": data_b64}))
-                    log_security_event("TERM_DATA_FORWARDED", client_ip, f"Session: {session_id}")
+                if session_id in sessions and sessions[session_id]['device_id'] == device_id and sessions[session_id]['ready']:
+                    if await send_to_browser(session_id, {"type": "term_data", "sessionId": session_id, "data": data_b64}):
+                        log_security_event("TERM_DATA_FORWARDED", client_ip, f"Session: {session_id}")
                 else:
                     log_security_event("INVALID_SESSION_DATA", client_ip, f"Session: {session_id}")
+
+            elif msg['type'] == 'session_ready':
+                session_id = msg['sessionId']
+                session = sessions.get(session_id)
+                if session and session['device_id'] == device_id and not session['ready']:
+                    session['ready'] = True
+                    await send_to_browser(session_id, {"type": "session_ready", "sessionId": session_id})
+
+            elif msg['type'] == 'session_exit':
+                session_id = msg['sessionId']
+                session = sessions.get(session_id)
+                if session and session['device_id'] == device_id:
+                    await send_to_browser(session_id, {"type": "session_closed", "sessionId": session_id})
+                    sessions.pop(session_id, None)
 
             elif msg['type'] == 'heartbeat':
                 await websocket.send_text(json.dumps({"type": "heartbeat_ack"}))

@@ -6,6 +6,7 @@ import http.client
 import json
 import os
 from pathlib import Path
+import re
 import signal
 import socket
 import subprocess
@@ -33,6 +34,7 @@ class BrowserAuthTests(unittest.IsolatedAsyncioTestCase):
         self.agents_file = Path(self.temp.name) / "agents.json"
         token_file = Path(self.temp.name) / "agent.token"
         issue_credential(self.agents_file, "test-agent", token_file)
+        self.token_file = token_file
         self.agent_token = token_file.read_text(encoding="utf-8").strip()
         with socket.socket() as listener:
             listener.bind(("127.0.0.1", 0))
@@ -115,6 +117,8 @@ class BrowserAuthTests(unittest.IsolatedAsyncioTestCase):
                 started = json.loads(await owner.recv())
                 self.assertEqual(started["type"], "session_started")
                 self.assertEqual(json.loads(await agent.recv())["sessionId"], started["sessionId"])
+                await agent.send(json.dumps({"type": "session_ready", "sessionId": started["sessionId"]}))
+                self.assertEqual(json.loads(await owner.recv())["type"], "session_ready")
 
                 async with websockets.connect(uri, origin=origin, additional_headers={"Cookie": cookie}) as other:
                     intruder_data = base64.b64encode(b"intruder\n").decode()
@@ -183,6 +187,8 @@ class BrowserAuthTests(unittest.IsolatedAsyncioTestCase):
                     await browser.send(json.dumps({"type": "start_session", "deviceId": "second-agent"}))
                     session = json.loads(await browser.recv())["sessionId"]
                     self.assertEqual(json.loads(await agent_b.recv())["sessionId"], session)
+                    await agent_b.send(json.dumps({"type": "session_ready", "sessionId": session}))
+                    self.assertEqual(json.loads(await browser.recv())["type"], "session_ready")
                     await agent_a.send(json.dumps({"type": "term_data", "sessionId": session, "data": base64.b64encode(b"forged").decode()}))
                     await agent_b.send(json.dumps({"type": "term_data", "sessionId": session, "data": base64.b64encode(b"legitimate").decode()}))
                     output = json.loads(await asyncio.wait_for(browser.recv(), 2))
@@ -238,6 +244,8 @@ class BrowserAuthTests(unittest.IsolatedAsyncioTestCase):
                     self.assertEqual(started["type"], "session_started")
                     sessions.append(started["sessionId"])
                     self.assertEqual(json.loads(await agent.recv())["sessionId"], sessions[-1])
+                    await agent.send(json.dumps({"type": "session_ready", "sessionId": sessions[-1]}))
+                    self.assertEqual(json.loads(await browser.recv())["type"], "session_ready")
                 await browser.send(json.dumps({"type": "start_session", "deviceId": "test-agent"}))
                 self.assertEqual(json.loads(await browser.recv())["message"], "Session limit reached")
                 await browser.send(json.dumps({"type": "term_input", "sessionId": sessions[0], "input": "@@@"}))
@@ -250,6 +258,110 @@ class BrowserAuthTests(unittest.IsolatedAsyncioTestCase):
                 await agent.send(json.dumps({"type": "term_data", "sessionId": sessions[0],
                                              "data": base64.b64encode(b"still works").decode()}))
                 self.assertEqual(base64.b64decode(json.loads(await browser.recv())["data"]), b"still works")
+
+    async def test_real_agent_sessions_are_isolated_and_closed(self):
+        agent_log = open(Path(self.temp.name) / "agent.log", "w+", encoding="utf-8")
+        agent = subprocess.Popen(
+            [sys.executable, "client/main.py", "--host", "127.0.0.1", "--port", str(self.port),
+             "--device-id", "test-agent", "--token-file", str(self.token_file)],
+            cwd=ROOT, stdout=agent_log, stderr=subprocess.STDOUT, start_new_session=True,
+            env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1", "PYTHONUNBUFFERED": "1"},
+        )
+        origin = f"http://127.0.0.1:{self.port}"
+        status, headers = self.request("POST", "/login", "password=a-test-password-only", {"Origin": origin})
+        self.assertEqual(status, 303)
+        cookie = headers["set-cookie"].split(";", 1)[0]
+        uri = f"ws://127.0.0.1:{self.port}/ws"
+
+        async def output_until(browser, pattern):
+            output = ""
+            for _ in range(40):
+                message = json.loads(await asyncio.wait_for(browser.recv(), 2))
+                if message["type"] == "term_data":
+                    output += base64.b64decode(message["data"]).decode(errors="replace")
+                if re.search(pattern, output):
+                    return output
+            self.fail(f"No {pattern} in terminal output")
+
+        async def open_session(browser):
+            await browser.send(json.dumps({"type": "start_session", "deviceId": "test-agent"}))
+            started = json.loads(await asyncio.wait_for(browser.recv(), 3))
+            self.assertEqual(started["type"], "session_started")
+            ready = json.loads(await asyncio.wait_for(browser.recv(), 3))
+            self.assertEqual(ready, {"type": "session_ready", "sessionId": started["sessionId"]})
+            return started["sessionId"]
+
+        try:
+            async with websockets.connect(uri, origin=origin, additional_headers={"Cookie": cookie}) as first, \
+                       websockets.connect(uri, origin=origin, additional_headers={"Cookie": cookie}) as second:
+                for _ in range(40):
+                    await first.send(json.dumps({"type": "list_devices"}))
+                    if "test-agent" in json.loads(await first.recv())["devices"]:
+                        break
+                    await asyncio.sleep(0.1)
+                else:
+                    self.fail("Agent did not register")
+                first_id = await open_session(first)
+                second_id = await open_session(second)
+                for browser, session_id, marker in ((first, first_id, "FIRST"), (second, second_id, "SECOND")):
+                    command = f"printf '{marker}_%s\\n' \"$$\"\n".encode()
+                    await browser.send(json.dumps({"type": "term_input", "sessionId": session_id,
+                                                   "input": base64.b64encode(command).decode()}))
+                first_output = await output_until(first, r"FIRST_\d+")
+                second_output = await output_until(second, r"SECOND_\d+")
+                first_pid = int(re.search(r"FIRST_(\d+)", first_output).group(1))
+                second_pid = int(re.search(r"SECOND_(\d+)", second_output).group(1))
+                self.assertNotEqual(first_pid, second_pid)
+                self.assertNotIn("SECOND_", first_output)
+                self.assertNotIn("FIRST_", second_output)
+                await first.send(json.dumps({"type": "close_session", "sessionId": first_id}))
+                self.assertEqual(json.loads(await first.recv())["type"], "session_closed")
+                for _ in range(30):
+                    try:
+                        os.kill(first_pid, 0)
+                    except ProcessLookupError:
+                        break
+                    await asyncio.sleep(0.1)
+                else:
+                    self.fail("Closed shell process remained alive")
+                await second.send(json.dumps({"type": "term_input", "sessionId": second_id,
+                                              "input": base64.b64encode(b"printf 'ALIVE\\n'\n").decode()}))
+                self.assertIn("ALIVE", await output_until(second, r"ALIVE\r\n"))
+                third_id = await open_session(first)
+                await first.send(json.dumps({"type": "term_input", "sessionId": third_id,
+                                             "input": base64.b64encode(b"printf 'THIRD_%s\\n' \"$$\"\n").decode()}))
+                third_pid = int(re.search(r"THIRD_(\d+)", await output_until(first, r"THIRD_\d+")).group(1))
+                await first.close()
+                for _ in range(30):
+                    try:
+                        os.kill(third_pid, 0)
+                    except ProcessLookupError:
+                        break
+                    await asyncio.sleep(0.1)
+                else:
+                    self.fail("Browser disconnect left a shell process alive")
+                os.killpg(agent.pid, signal.SIGTERM)
+                for _ in range(20):
+                    message = json.loads(await asyncio.wait_for(second.recv(), 5))
+                    if message["type"] == "session_closed":
+                        self.assertEqual(message["sessionId"], second_id)
+                        break
+                else:
+                    self.fail("No session_closed event after agent SIGTERM")
+                await asyncio.to_thread(agent.wait, 5)
+                for _ in range(30):
+                    try:
+                        os.kill(second_pid, 0)
+                    except ProcessLookupError:
+                        break
+                    await asyncio.sleep(0.1)
+                else:
+                    self.fail("Shell process remained after agent SIGTERM")
+        finally:
+            if agent.poll() is None:
+                os.killpg(agent.pid, signal.SIGKILL)
+                agent.wait(timeout=5)
+            agent_log.close()
 
 
 if __name__ == "__main__":

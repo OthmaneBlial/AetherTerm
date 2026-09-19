@@ -56,7 +56,7 @@ Une case est cochée seulement après satisfaction de **tous** les critères d'a
 - [x] 1.2 Enrôlement et révocation d'agents — identité liée à l'appareil, fichier 0600, rotation et révocation vérifiées par tests et aller-retour réel sur boucle locale.
 - [ ] 1.3 Transport distant chiffré — HTTPS/WSS direct et proxy Caddy 2.11.4 testés localement avec certificat approuvé/rejeté ; accès distant et navigateur graphique non vérifiés.
 - [ ] 1.4 Protocole et ressources bornés — schémas, trames, quotas de sessions et limiteurs IP distincts testés ; backpressure, charge modérée et fermeture lente encore à valider.
-- [ ] 2.1 PTY isolés et cycle de vie.
+- [ ] 2.1 PTY isolés et cycle de vie — deux shells et navigateurs, fermeture explicite, fermeture du navigateur et SIGTERM de l'agent testés localement ; Linux, SIGINT et coupure du serveur encore à valider.
 - [ ] 2.2 Terminal interactif et Unicode exact.
 - [ ] 2.3 Reconnexion et états d'erreur.
 - [ ] 3.1 Premier démarrage jusqu'au shell.

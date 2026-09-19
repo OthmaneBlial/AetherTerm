@@ -88,7 +88,9 @@ async def browser_round_trip(port: int, context: ssl.SSLContext, cookie: str) ->
             raise RuntimeError("Agent did not register through Caddy")
         await browser.send(json.dumps({"type": "start_session", "deviceId": "proxy-agent"}))
         session = json.loads(await browser.recv())["sessionId"]
-        await asyncio.sleep(0.2)
+        ready = json.loads(await asyncio.wait_for(browser.recv(), 3))
+        if ready != {"type": "session_ready", "sessionId": session}:
+            raise AssertionError(f"Session did not become ready: {ready}")
         command = "printf 'PROXY_%s\\n' VERIFIED\n"
         await browser.send(json.dumps({"type": "term_input", "sessionId": session, "input": base64.b64encode(command.encode()).decode()}))
         output = ""
