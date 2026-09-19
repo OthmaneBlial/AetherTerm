@@ -145,7 +145,8 @@ async def main():
                     """, arg=prior_count, timeout=10000)
                     await page.keyboard.type("vim --version | head -n 1")
                     await page.keyboard.press("Enter")
-                    await page.get_by_text("VIM - Vi IMproved", exact=False).wait_for(state="attached", timeout=10000)
+                    await page.locator(".xterm-screen").get_by_text("VIM - Vi IMproved", exact=False).first.wait_for(
+                        state="attached", timeout=10000)
                     await page.keyboard.type("vim -Nu NONE -n /tmp/aetherterm-browser-vim.txt")
                     await page.keyboard.press("Enter")
                     await page.wait_for_function("""() =>
@@ -165,7 +166,8 @@ async def main():
                     await page.keyboard.press("Enter")
                     await page.keyboard.type("cat /tmp/aetherterm-browser-vim.txt")
                     await page.keyboard.press("Enter")
-                    await page.get_by_text("VIM_BROWSER_OK", exact=True).wait_for(state="attached", timeout=10000)
+                    await page.locator(".xterm-screen").get_by_text("VIM_BROWSER_OK", exact=True).first.wait_for(
+                        state="attached", timeout=10000)
                     await page.keyboard.type("cd /tmp")
                     await page.keyboard.press("Enter")
                     await page.keyboard.type("clear")
