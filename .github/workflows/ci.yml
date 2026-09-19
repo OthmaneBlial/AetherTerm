@@ -57,3 +57,19 @@ jobs:
           npm audit --audit-level=high
       - name: Check committed assets match source
         run: git diff --exit-code -- web/assets
+
+  browser-e2e:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.13'
+          cache: pip
+      - name: Install app and Chromium test driver
+        run: |
+          python -m pip install . playwright==1.63.0
+          python -m playwright install --with-deps chromium
+      - name: Exercise the real browser journey
+        run: python scripts/verify_browser.py

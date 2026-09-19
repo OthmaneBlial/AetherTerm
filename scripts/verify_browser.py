@@ -1,0 +1,117 @@
+"""Headless browser smoke test of a real server, agent and PTY on Linux CI."""
+
+import asyncio
+import http.client
+import os
+from pathlib import Path
+import re
+import signal
+import socket
+import subprocess
+import sys
+import tempfile
+
+from playwright.async_api import async_playwright, expect
+
+from server.agents import issue_credential
+from server.auth import initialize_operator
+
+
+def stop(process):
+    if process is None or process.poll() is not None:
+        return
+    os.killpg(process.pid, signal.SIGTERM)
+    try:
+        process.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        os.killpg(process.pid, signal.SIGKILL)
+        process.wait(timeout=5)
+        raise AssertionError(f"Process {process.pid} did not stop after SIGTERM")
+
+
+async def main():
+    with tempfile.TemporaryDirectory(prefix="aetherterm-browser-check-") as temporary:
+        directory = Path(temporary)
+        operator_file = directory / "operator.json"
+        agents_file = directory / "agents.json"
+        credential = directory / "browser-agent.token"
+        initialize_operator(operator_file, "temporary-browser-password")
+        issue_credential(agents_file, "browser-agent", credential)
+        with socket.socket() as listener:
+            listener.bind(("127.0.0.1", 0))
+            port = listener.getsockname()[1]
+        environment = {**os.environ, "AETHERTERM_OPERATOR_FILE": str(operator_file),
+                       "AETHERTERM_AGENTS_FILE": str(agents_file), "PYTHONUNBUFFERED": "1"}
+        executable_dir = Path(sys.prefix) / "bin"
+        server_log = (directory / "server.log").open("w+", encoding="utf-8")
+        agent_log = (directory / "agent.log").open("w+", encoding="utf-8")
+        server = agent = None
+        try:
+            server = subprocess.Popen([str(executable_dir / "aetherterm-server"), "--port", str(port)],
+                                      cwd=directory, env=environment, stdout=server_log,
+                                      stderr=subprocess.STDOUT, start_new_session=True)
+            for _ in range(100):
+                try:
+                    connection = http.client.HTTPConnection("127.0.0.1", port, timeout=0.2)
+                    connection.request("GET", "/login")
+                    response = connection.getresponse()
+                    response.read()
+                    connection.close()
+                    if response.status == 200:
+                        break
+                except OSError:
+                    await asyncio.sleep(0.1)
+            else:
+                raise AssertionError("Browser test server did not start")
+            agent = subprocess.Popen([str(executable_dir / "aetherterm-agent"), "--host", "127.0.0.1",
+                                      "--port", str(port), "--device-id", "browser-agent",
+                                      "--token-file", str(credential)], cwd=directory, env=environment,
+                                     stdout=agent_log, stderr=subprocess.STDOUT, start_new_session=True)
+
+            async with async_playwright() as playwright:
+                browser = await playwright.chromium.launch(headless=True)
+                page = await browser.new_page(viewport={"width": 1280, "height": 800})
+                errors = []
+                page.on("pageerror", lambda error: errors.append(str(error)))
+                page.on("console", lambda message: errors.append(message.text) if message.type == "error" else None)
+                try:
+                    await page.goto(f"http://127.0.0.1:{port}/login")
+                    await page.get_by_label("Operator password").fill("temporary-browser-password")
+                    await page.get_by_role("button", name="Enter console").click()
+                    await page.wait_for_url("**/web/")
+                    await expect(page.get_by_role("heading", name="Remote workspace.")).to_be_visible()
+                    device = page.get_by_role("button", name=re.compile(r"browser-agent, online, open shell"))
+                    await device.click(timeout=15000)
+                    await expect(page.get_by_text("Shell ready on browser-agent.", exact=False)).to_be_visible()
+                    await page.locator(".xterm-helper-textarea").focus()
+                    await page.keyboard.type("printf 'BROWSER_OK\\n'")
+                    await page.keyboard.press("Enter")
+                    await page.get_by_text("BROWSER_OK", exact=True).wait_for(state="attached", timeout=10000)
+                    await page.set_viewport_size({"width": 375, "height": 812})
+                    assert await page.evaluate("document.documentElement.scrollWidth <= window.innerWidth"), "Mobile horizontal overflow"
+                    await expect(page.get_by_role("button", name="Close session")).to_be_visible()
+                    await page.get_by_role("button", name="Close session").click()
+                    await expect(page.get_by_role("heading", name="Your next shell starts here.")).to_be_visible()
+                    await page.get_by_role("button", name="Sign out").click()
+                    await expect(page.get_by_role("heading", name="Welcome back.")).to_be_visible()
+                    assert not errors, f"Browser console errors: {errors}"
+                finally:
+                    await browser.close()
+        except BaseException:
+            server_log.flush()
+            agent_log.flush()
+            print((directory / "server.log").read_text(encoding="utf-8"), file=sys.stderr)
+            print((directory / "agent.log").read_text(encoding="utf-8"), file=sys.stderr)
+            raise
+        finally:
+            try:
+                stop(agent)
+            finally:
+                stop(server)
+                server_log.close()
+                agent_log.close()
+    print("Chromium login, real PTY, mobile layout and sign-out: PASS")
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

@@ -68,7 +68,7 @@ Une case est cochée seulement après satisfaction de **tous** les critères d'a
 - [ ] 5.1 Installation et déploiement reproductibles.
 - [ ] 5.2 Documentation architecture, sécurité et opérations.
 - [ ] 5.3 README et captures réelles.
-- [ ] 6.1 CI bloquante — run [35444767496](https://github.com/OthmaneBlial/AetherTerm/actions/runs/35444767496) vert sur `f0b1cdd` avec actions figées (Linux Python 3.13, PTY réel, wheel installé, assets Web) ; scans ajoutés mais non encore validés en CI, tests navigateur et politique de blocage PR encore requis.
+- [ ] 6.1 CI bloquante — run [35444996684](https://github.com/OthmaneBlial/AetherTerm/actions/runs/35444996684) vert sur `86fdb31` avec actions figées (Linux Python 3.13, PTY réel, wheel installé, assets Web et scans) ; test navigateur ajouté mais non encore validé en CI, politique de blocage PR encore requise.
 - [ ] 6.2 Artefacts téléchargeables/installables — wheel local installé et testé sur macOS 3.13 ; conteneur, binaire Linux, installation Linux et téléchargements publiés encore requis.
 - [ ] 6.3 Contributions et présentation GitHub.
 - [ ] 6.4 Première release vérifiée.
