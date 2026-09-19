@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/OthmaneBlial/AetherTerm/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/OthmaneBlial/AetherTerm/actions/workflows/ci.yml)
 
-An early prototype that relays a shell on an agent machine to a browser through a FastAPI WebSocket server. It is **not ready for network deployment**.
+An early alpha, self-hosted browser terminal for one operator and explicitly enrolled Linux agents. Agents open an authenticated channel to the server, while the browser receives only the operator-owned PTY sessions. It is **not ready for network deployment**.
 
 ![AetherTerm desktop console running a real Linux shell in Chromium](assets/screenshots/desktop.png)
 
@@ -82,6 +82,6 @@ AetherTerm does not speak SSH. Compatibility, security and ease-of-use compariso
 | Browser access | Password login, cookie session, same-origin WebSocket and negative cross-browser integration test. The sole operator can access every enrolled active device. | Expiry/revocation under load, external deployment and independent security review. |
 | Agent identity | Per-device credential-file enrollment, rotation and revocation tested locally. | Remote encrypted transport, Linux installation and operating guidance. |
 | Transport | Remote cleartext refused in code; direct TLS and a local Caddy HTTPS/WSS proxy test with certificate validation passed. | Public certificate, external network and graphical browser validation. |
-| Packaging and automation | A wheel installed in clean Python 3.13 environments served its bundled UI and completed an authorized PTY round trip on macOS and Ubuntu 24.04 CI. The non-root container, dependency scans, local-only Web assets, three browser journeys and Linux x86_64 agent binary with a real PTY passed in [run 35450130215](https://github.com/OthmaneBlial/AetherTerm/actions/runs/35450130215). Eight PR checks are required; an intentionally failing draft PR was blocked in [run 35449706256](https://github.com/OthmaneBlial/AetherTerm/actions/runs/35449706256). The repository administrator can bypass the PR gate for direct pushes. No published release artifact is verified. | Publicly tested downloads, independent review and release checks. |
+| Packaging and automation | A wheel installed in clean Python 3.13 environments served its bundled UI and completed an authorized PTY round trip on macOS and Ubuntu 24.04 CI. The non-root container, dependency scans, local-only Web assets, three browser journeys and Linux x86_64 agent binary with a real PTY passed in [run 35450521219](https://github.com/OthmaneBlial/AetherTerm/actions/runs/35450521219). Eight PR checks are required; an intentionally failing draft PR was blocked in [run 35449706256](https://github.com/OthmaneBlial/AetherTerm/actions/runs/35449706256). The repository administrator can bypass the PR gate for direct pushes. No published release artifact is verified. | Publicly tested downloads, independent review and release checks. |
 
 The MIT license is in [LICENSE](LICENSE). The [contribution guide](CONTRIBUTING.md) covers setup and safe reporting; please avoid deploying this revision to a reachable network. The complete sequence is tracked in [ROADMAP.md](ROADMAP.md), with a [changelog](CHANGELOG.md) and [release checklist](docs/RELEASE_CHECKLIST.md) prepared for the eventual first release.
