@@ -222,10 +222,13 @@ function handleMessage(event) {
 
 function connect() {
   clearTimeout(reconnectTimer)
+  reconnectTimer = null
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-  socket = new WebSocket(`${protocol}//${window.location.host}/ws`, 'aetherterm.v1')
+  const connection = new WebSocket(`${protocol}//${window.location.host}/ws`, 'aetherterm.v1')
+  socket = connection
   setConnection('Connecting', 'connecting')
-  socket.addEventListener('open', () => {
+  connection.addEventListener('open', () => {
+    if (socket !== connection) return
     online = true
     reauthLink.hidden = true
     reconnectDelay = 1000
@@ -233,8 +236,9 @@ function connect() {
     setNotice('Choose a connected device to open a shell.', 'success')
     send({ type: 'list_devices' })
   })
-  socket.addEventListener('message', handleMessage)
-  socket.addEventListener('close', async event => {
+  connection.addEventListener('message', handleMessage)
+  connection.addEventListener('close', async event => {
+    if (socket !== connection) return
     online = false
     pendingDevice = null
     for (const id of [...sessions.keys()]) removeSession(id)
@@ -247,17 +251,26 @@ function connect() {
     }
     try {
       const response = await fetch('/auth/status', { cache: 'no-store' })
+      if (socket !== connection) return
       if (response.status === 401) {
         setNotice('Access expired or was revoked. Sign in again.', 'error')
         reauthLink.hidden = false
         return
       }
     } catch { /* Server is offline; retry below. */ }
+    if (socket !== connection) return
     setNotice('Connection lost. Retrying; previous shells are closed.', 'error')
     reconnectTimer = setTimeout(connect, reconnectDelay)
     reconnectDelay = Math.min(reconnectDelay * 2, 30000)
   })
 }
+
+window.addEventListener('offline', () => {
+  if (socket && socket.readyState < WebSocket.CLOSING) socket.close()
+})
+window.addEventListener('online', () => {
+  if (!online && reconnectTimer !== null) connect()
+})
 
 document.getElementById('refresh-devices').addEventListener('click', () => {
   if (!send({ type: 'list_devices' })) setNotice('The server is offline. Wait for reconnection.', 'error')
