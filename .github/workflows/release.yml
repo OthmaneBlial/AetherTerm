@@ -1,0 +1,67 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    name: Build and publish release assets
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.13'
+          cache: pip
+
+      - name: Install the frozen release toolchain
+        run: |
+          python -m pip install --require-hashes -r requirements-freeze.lock
+          python -m pip install --no-deps .
+
+      - name: Require the tag and package versions to match
+        run: |
+          package_version=$(python -c 'import importlib.metadata; print(importlib.metadata.version("aetherterm"))')
+          tag_version="${GITHUB_REF_NAME#v}"
+          test "$tag_version" = "$package_version"
+
+      - name: Build Python distributions
+        run: python -m build --wheel --sdist
+
+      - name: Build the Linux x86_64 agent
+        run: |
+          test "$(uname -m)" = x86_64
+          pyinstaller --onefile --clean --noconfirm --name aetherterm-agent \
+            --paths "$GITHUB_WORKSPACE" \
+            --specpath "$RUNNER_TEMP/aetherterm-pyi-spec" \
+            --workpath "$RUNNER_TEMP/aetherterm-pyi-build" \
+            --distpath artifacts/bin scripts/frozen_agent.py
+          mv artifacts/bin/aetherterm-agent "artifacts/bin/aetherterm-agent-${GITHUB_REF_NAME#v}-linux-x86_64"
+
+      - name: Assemble and hash release assets
+        run: |
+          mkdir -p release
+          cp dist/*.whl dist/*.tar.gz release/
+          cp "artifacts/bin/aetherterm-agent-${GITHUB_REF_NAME#v}-linux-x86_64" release/
+          (cd release && sha256sum * > SHA256SUMS)
+          sha256sum --check release/SHA256SUMS
+
+      - name: Create the GitHub release from the verified tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" release/* \
+            --verify-tag \
+            --title "AetherTerm $GITHUB_REF_NAME" \
+            --generate-notes

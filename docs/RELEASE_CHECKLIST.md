@@ -21,6 +21,7 @@ This is a preparation document, not evidence that a release exists. Record the e
 ## Gate 3: publish and independently verify
 
 - [ ] Only after gates 1 and 2, create the intended signed tag if the signing chain is available; otherwise document why the tag is unsigned. Publish the release and attach the tested artifacts plus `SHA256SUMS`.
+- [ ] The tag must equal the package version (for example `v0.1.0a0`). The pinned [release workflow](../.github/workflows/release.yml) rebuilds the wheel, source archive and Linux x86_64 agent from that tag, verifies their hashes, and uploads only those checked files. A green workflow on a tag is still required before calling the public release complete.
 - [ ] Download every advertised asset from the public release page in a fresh location, verify SHA-256 and repeat the authorized shell smoke test. Confirm the release page, README links and GitHub metadata actually resolve.
 - [ ] Record the rollback path: stop the agent and server, restore a known-good image/wheel and private identity backup, rotate credentials if an old registry backup may reauthorize one, and verify a new shell. Do not promise shell continuity across rollback.
 - [ ] Observe first public reports and route suspected access-control defects through [SECURITY.md](../SECURITY.md). Update the changelog and support status from real outcomes.
