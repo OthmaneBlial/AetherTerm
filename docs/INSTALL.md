@@ -26,6 +26,8 @@ The [`linux-agent-binary` CI job](../.github/workflows/ci.yml) also builds a PyI
 
 The `linux-agent-x86_64` workflow artifact contains the binary and `SHA256SUMS` for seven days. It is a CI artifact, **not a GitHub Release download**. After obtaining the artifact from that run, verify it in its extracted directory before first use:
 
+The artifact from [run 35448920673](https://github.com/OthmaneBlial/AetherTerm/actions/runs/35448920673) was also downloaded to a temporary macOS directory with `gh run download`. Its `SHA256SUMS` check passed; the binary is a 24 MiB Linux x86_64 ELF with SHA-256 `cfa1519e30fea83bc03783e5f23466955a2598118eadb11b1ed9812c225f141a`. macOS cannot execute that ELF; the Linux CI job supplies the real PTY execution evidence. This check does not establish a permanent public download.
+
 ```bash
 sha256sum --check SHA256SUMS
 chmod +x aetherterm-agent-0.1.0a0-linux-x86_64
