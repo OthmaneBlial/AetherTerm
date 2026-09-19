@@ -129,6 +129,20 @@ async def main():
                     await page.keyboard.type("printf 'BROWSER_RETURNED\\n'")
                     await page.keyboard.press("Enter")
                     await page.get_by_text("BROWSER_RETURNED", exact=True).wait_for(state="attached", timeout=10000)
+                    await page.keyboard.type("printf 'HISTORY_ARROW_OK\\n'")
+                    await page.keyboard.press("Enter")
+                    await page.get_by_text("HISTORY_ARROW_OK", exact=True).wait_for(state="attached", timeout=10000)
+                    await page.wait_for_function("""() =>
+                        (document.querySelector('.xterm-screen').textContent.match(/HISTORY_ARROW_OK/g) || []).length >= 2
+                    """, timeout=10000)
+                    prior_count = await page.locator(".xterm-screen").evaluate(
+                        "element => (element.textContent.match(/HISTORY_ARROW_OK/g) || []).length"
+                    )
+                    await page.keyboard.press("ArrowUp")
+                    await page.keyboard.press("Enter")
+                    await page.wait_for_function("""count =>
+                        (document.querySelector('.xterm-screen').textContent.match(/HISTORY_ARROW_OK/g) || []).length > count
+                    """, arg=prior_count, timeout=10000)
                     await page.keyboard.type("cd /tmp")
                     await page.keyboard.press("Enter")
                     await page.keyboard.type("clear")
