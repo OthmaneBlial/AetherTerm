@@ -24,6 +24,8 @@ class ServerState:
     web_dir: Path
     browser_connections: ConnectionLimiter = field(default_factory=ConnectionLimiter)
     agent_connections: ConnectionLimiter = field(default_factory=ConnectionLimiter)
+    browser_sockets: set[WebSocket] = field(default_factory=set)
+    agent_sockets: set[WebSocket] = field(default_factory=set)
     devices: dict[str, WebSocket] = field(default_factory=dict)
     device_credentials: dict[str, str] = field(default_factory=dict)
     sessions: dict[str, SessionRecord] = field(default_factory=dict)

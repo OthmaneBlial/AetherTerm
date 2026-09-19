@@ -16,6 +16,7 @@ from .agents import AgentRegistry, agents_file
 from .auth import COOKIE_NAME, SESSION_SECONDS, OperatorAuth, operator_file
 from .network import transport_allowed
 from .limits import (SlidingWindowLimiter, MAX_CONNECTED_AGENTS,
+                     MAX_OPEN_AGENT_SOCKETS, MAX_OPEN_BROWSER_SOCKETS,
                      MAX_SESSIONS_PER_AGENT, MAX_SESSIONS_PER_BROWSER, MAX_SESSIONS_TOTAL,
                      SESSION_START_TIMEOUT)
 from .protocol import ProtocolError, parse_message
@@ -211,6 +212,9 @@ async def web_websocket(websocket: WebSocket):
         log_security_event("WEB_ACCESS_DENIED", client_ip)
         await websocket.close(code=1008, reason="Authentication or origin required")
         return
+    if len(state.browser_sockets) >= MAX_OPEN_BROWSER_SOCKETS:
+        await websocket.close(code=1008, reason="Browser connection limit reached")
+        return
 
     # Security check: Rate limiting
     if not browser_connections.allow(client_ip):
@@ -218,7 +222,12 @@ async def web_websocket(websocket: WebSocket):
         await websocket.close(code=1008, reason="Rate limit exceeded")
         return
 
-    await websocket.accept()
+    state.browser_sockets.add(websocket)
+    try:
+        await websocket.accept()
+    except BaseException:
+        state.browser_sockets.discard(websocket)
+        raise
     operator_auth.register_socket(session_key, websocket)
     message_rate = SlidingWindowLimiter(240, 1, max_keys=1)
     log_security_event("WEB_CONNECTION_ESTABLISHED", client_ip, "Web client connected")
@@ -313,6 +322,7 @@ async def web_websocket(websocket: WebSocket):
     except Exception as e:
         log_security_event("WEB_ERROR", client_ip, type(e).__name__)
     finally:
+        state.browser_sockets.discard(websocket)
         operator_auth.unregister_socket(session_key, websocket)
         log_security_event("WEB_CONNECTION_CLOSED", client_ip, "Web client disconnected")
         # remove sessions for this web_ws
@@ -346,8 +356,16 @@ async def client_websocket(websocket: WebSocket):
         log_security_event("CLIENT_RATE_LIMITED", client_ip, "Client connection rate limited")
         await websocket.close(code=1008, reason="Rate limit exceeded")
         return
+    if len(state.agent_sockets) >= MAX_OPEN_AGENT_SOCKETS:
+        await websocket.close(code=1008, reason="Agent connection limit reached")
+        return
 
-    await websocket.accept()
+    state.agent_sockets.add(websocket)
+    try:
+        await websocket.accept()
+    except BaseException:
+        state.agent_sockets.discard(websocket)
+        raise
     log_security_event("CLIENT_CONNECTION_ESTABLISHED", client_ip, "Client connected")
     device_id = None
     token_hash = None
@@ -443,6 +461,7 @@ async def client_websocket(websocket: WebSocket):
     except Exception as e:
         log_security_event("CLIENT_ERROR", client_ip, type(e).__name__)
     finally:
+        state.agent_sockets.discard(websocket)
         if device_id and devices.get(device_id) is websocket:
             device_last_seen[device_id] = time.time()
             del devices[device_id]

@@ -15,6 +15,7 @@ from .limits import SlidingWindowLimiter
 
 COOKIE_NAME = "aetherterm_session"
 SESSION_SECONDS = 8 * 60 * 60
+MAX_OPERATOR_SESSIONS = 32
 SCRYPT_N = 2**14
 SCRYPT_R = 8
 SCRYPT_P = 1
@@ -90,8 +91,13 @@ class OperatorAuth:
         return self.login_attempts.allow(ip)
 
     def create_session(self) -> str:
+        now = time.monotonic()
+        self.sessions = {key: expiry for key, expiry in self.sessions.items() if expiry > now}
+        if len(self.sessions) >= MAX_OPERATOR_SESSIONS:
+            oldest = min(self.sessions, key=self.sessions.__getitem__)
+            self.sessions.pop(oldest)
         token = secrets.token_urlsafe(32)
-        self.sessions[self._key(token)] = time.monotonic() + SESSION_SECONDS
+        self.sessions[self._key(token)] = now + SESSION_SECONDS
         return token
 
     @staticmethod

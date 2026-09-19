@@ -31,7 +31,7 @@ navigateur -- HTTP(S) /login --> serveur FastAPI
 
 ## Limites et défaillances prévues
 
-- Chaque trame JSON reçue par le serveur est validée et limitée à 64 Kio ; les fragments de terminal sont limités à 16 Kio, les dimensions et le nombre de sessions sont bornés. Le code impose aussi des limites par adresse IP, un délai de démarrage du shell et des envois serveur bornés. Ces limites ne remplacent pas une mesure de charge. Le protocole n'a pas encore de champ de version explicite.
+- Chaque trame JSON reçue par le serveur est validée et limitée à 64 Kio ; les fragments de terminal sont limités à 16 Kio, les dimensions, sessions opérateur, connexions ouvertes et sessions PTY sont bornées. Le code impose aussi des limites par adresse IP, un délai de démarrage du shell et des envois serveur bornés. Ces limites ne remplacent pas une mesure de charge. Le protocole n'a pas encore de champ de version explicite.
 - La rotation ou révocation d'un appareil rend immédiatement son identité inactive et ferme sa connexion au prochain contrôle serveur. La déconnexion opérateur révoque son cookie et ferme ses sockets ; le changement du fichier opérateur invalide les sessions en mémoire au prochain contrôle.
 - Le serveur écrit des événements d'audit JSON bornés, sans commandes ni octets du terminal. L'agent affiche son état de connexion. Aucune sortie de shell ou historique de commande n'est stocké par l'application. Les logs du proxy et de la plate-forme restent à configurer séparément.
 - Un agent compromis, le compte système qui exécute `/bin/bash`, le serveur et le proxy TLS restent des domaines de confiance. AetherTerm ne fournit ni sandbox de shell, ni SSH, ni rôles multiples.

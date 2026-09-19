@@ -7,11 +7,23 @@ import json
 import tempfile
 import unittest
 
-from server.auth import initialize_operator
+from server.auth import MAX_OPERATOR_SESSIONS, OperatorAuth, initialize_operator
 from server.main import create_app, log_security_event
 
 
 class ServerFactoryTests(unittest.TestCase):
+    def test_operator_sessions_expire_and_remain_bounded(self):
+        with tempfile.TemporaryDirectory(prefix="aetherterm-operator-") as directory:
+            operator_file = Path(directory) / "operator.json"
+            initialize_operator(operator_file, "bounded-test-password")
+            auth = OperatorAuth(operator_file)
+            first = auth.create_session()
+            for _ in range(MAX_OPERATOR_SESSIONS):
+                latest = auth.create_session()
+            self.assertEqual(len(auth.sessions), MAX_OPERATOR_SESSIONS)
+            self.assertIsNone(auth.session_key(first))
+            self.assertIsNotNone(auth.session_key(latest))
+
     def test_audit_log_redacts_unexpected_detail(self):
         output = StringIO()
         with redirect_stdout(output):
