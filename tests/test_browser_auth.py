@@ -371,6 +371,90 @@ class BrowserAuthTests(unittest.IsolatedAsyncioTestCase):
                       and after_cpu is not None else
                       f"Slow browser burst: 1.6 MiB relayed; sibling latency <= {worst_healthy_delay:.2f}s")
 
+    async def test_continuous_output_keeps_sibling_responsive(self):
+        origin = f"http://127.0.0.1:{self.port}"
+        status, headers = self.request("POST", "/login", "password=a-test-password-only", {"Origin": origin})
+        self.assertEqual(status, 303)
+        cookie = headers["set-cookie"].split(";", 1)[0]
+        browser_uri = f"ws://127.0.0.1:{self.port}/ws"
+        rss_file = Path(f"/proc/{self.server.pid}/status")
+        stat_file = Path(f"/proc/{self.server.pid}/stat")
+
+        def rss_bytes():
+            if not rss_file.is_file():
+                return None
+            match = re.search(r"^VmRSS:\s+(\d+) kB", rss_file.read_text(), re.MULTILINE)
+            return int(match.group(1)) * 1024 if match else None
+
+        def cpu_seconds():
+            if not stat_file.is_file():
+                return None
+            fields = stat_file.read_text().rsplit(")", 1)[1].split()
+            return (int(fields[11]) + int(fields[12])) / os.sysconf("SC_CLK_TCK")
+
+        async with connect(f"ws://127.0.0.1:{self.port}/client") as agent:
+            await agent.send(json.dumps({"type": "register", "deviceId": "test-agent", "token": self.agent_token}))
+            self.assertEqual(json.loads(await agent.recv())["type"], "registered")
+            async with connect(browser_uri, origin=origin, additional_headers={"Cookie": cookie}) as owner, \
+                       connect(browser_uri, origin=origin, additional_headers={"Cookie": cookie}) as sibling:
+                await owner.send(json.dumps({"type": "start_session", "deviceId": "test-agent"}))
+                session_id = json.loads(await owner.recv())["sessionId"]
+                self.assertEqual(json.loads(await agent.recv())["sessionId"], session_id)
+                await agent.send(json.dumps({"type": "session_ready", "sessionId": session_id}))
+                self.assertEqual(json.loads(await owner.recv())["type"], "session_ready")
+                baseline_rss = rss_bytes()
+                baseline_cpu = cpu_seconds()
+                peak_rss = baseline_rss or 0
+                frame = base64.b64encode(b"x" * 8192).decode()
+                frames = 600
+
+                async def collect_output():
+                    for _ in range(frames):
+                        message = json.loads(await asyncio.wait_for(owner.recv(), 3))
+                        self.assertEqual(message["type"], "term_data")
+                        self.assertEqual(message["sessionId"], session_id)
+                        self.assertEqual(len(base64.b64decode(message["data"])), 8192)
+
+                reader = asyncio.create_task(collect_output())
+                worst_sibling_delay = 0.0
+                started = time.monotonic()
+                try:
+                    for index in range(frames):
+                        await asyncio.wait_for(agent.send(json.dumps({"type": "term_data", "sessionId": session_id,
+                                                                     "data": frame})), 2)
+                        if index % 50 == 0:
+                            sibling_started = time.monotonic()
+                            await sibling.send(json.dumps({"type": "list_devices"}))
+                            listing = json.loads(await asyncio.wait_for(sibling.recv(), 2))
+                            self.assertEqual(listing["devices"], ["test-agent"])
+                            worst_sibling_delay = max(worst_sibling_delay, time.monotonic() - sibling_started)
+                            current_rss = rss_bytes()
+                            if current_rss is not None:
+                                peak_rss = max(peak_rss, current_rss)
+                        await asyncio.sleep(0.02)
+                    await asyncio.wait_for(reader, 5)
+                finally:
+                    reader.cancel()
+                    await asyncio.gather(reader, return_exceptions=True)
+                elapsed = time.monotonic() - started
+                self.assertGreater(elapsed, 10)
+                self.assertLess(worst_sibling_delay, 2)
+                if baseline_rss is not None:
+                    self.assertLess(peak_rss - baseline_rss, 128 * 1024 * 1024)
+                after_cpu = cpu_seconds()
+                if baseline_cpu is not None and after_cpu is not None:
+                    self.assertLess(after_cpu - baseline_cpu, 10)
+                await owner.send(json.dumps({"type": "close_session", "sessionId": session_id}))
+                self.assertEqual(json.loads(await asyncio.wait_for(agent.recv(), 3)),
+                                 {"type": "close_session", "sessionId": session_id})
+                metrics = (f"Continuous output: {frames * 8192 / 1048576:.1f} MiB in {elapsed:.1f}s; "
+                           f"sibling latency <= {worst_sibling_delay:.2f}s")
+                if baseline_rss is not None:
+                    metrics += f"; server RSS growth {((peak_rss - baseline_rss) / 1048576):.1f} MiB"
+                if baseline_cpu is not None and after_cpu is not None:
+                    metrics += f"; CPU {after_cpu - baseline_cpu:.2f}s"
+                print(metrics)
+
     async def test_browser_reconnect_burst_is_bounded_without_blocking_agent(self):
         origin = f"http://127.0.0.1:{self.port}"
         status, headers = self.request("POST", "/login", "password=a-test-password-only", {"Origin": origin})
