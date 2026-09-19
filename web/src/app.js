@@ -116,7 +116,7 @@ function fitSession(session) {
   }
 }
 
-function activateSession(sessionId) {
+function activateSession(sessionId, { focusTerminal = true } = {}) {
   activeSessionId = sessionId
   for (const session of sessions.values()) {
     const active = session.id === sessionId
@@ -129,7 +129,10 @@ function activateSession(sessionId) {
   const session = sessions.get(sessionId)
   interruptButton.disabled = !session?.ready || !online
   terminalState.textContent = session ? `${session.deviceId.toUpperCase()} · ${session.ready ? 'SHELL READY' : 'STARTING SHELL'}` : 'NO ACTIVE SESSION'
-  if (session) requestAnimationFrame(() => { fitSession(session); session.terminal.focus() })
+  if (session) requestAnimationFrame(() => {
+    fitSession(session)
+    if (focusTerminal) session.terminal.focus()
+  })
 }
 
 function createSession(id, deviceId) {
@@ -137,6 +140,8 @@ function createSession(id, deviceId) {
   tab.type = 'button'
   tab.className = 'session-tab'
   tab.setAttribute('role', 'tab')
+  tab.id = `session-tab-${id}`
+  tab.setAttribute('aria-controls', `session-panel-${id}`)
   tab.textContent = deviceId
   tab.addEventListener('click', () => activateSession(id))
   tabsElement.append(tab)
@@ -144,6 +149,8 @@ function createSession(id, deviceId) {
   const pane = document.createElement('div')
   pane.className = 'terminal-pane'
   pane.setAttribute('role', 'tabpanel')
+  pane.id = `session-panel-${id}`
+  pane.setAttribute('aria-labelledby', tab.id)
   pane.setAttribute('aria-label', `Terminal on ${deviceId}`)
   terminalsElement.append(pane)
 
@@ -264,6 +271,18 @@ function connect() {
     reconnectDelay = Math.min(reconnectDelay * 2, 30000)
   })
 }
+
+tabsElement.addEventListener('keydown', event => {
+  if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key) || !sessions.size) return
+  event.preventDefault()
+  const ids = [...sessions.keys()]
+  const currentIndex = ids.indexOf(activeSessionId)
+  const nextIndex = event.key === 'Home' ? 0 : event.key === 'End' ? ids.length - 1
+    : (currentIndex + (event.key === 'ArrowRight' ? 1 : -1) + ids.length) % ids.length
+  const nextId = ids[nextIndex]
+  activateSession(nextId, { focusTerminal: false })
+  sessions.get(nextId).tab.focus()
+})
 
 window.addEventListener('offline', () => {
   if (socket && socket.readyState < WebSocket.CLOSING) socket.close()

@@ -103,6 +103,26 @@ async def main():
                     await page.keyboard.press("Enter")
                     await page.locator(".xterm-screen").get_by_text("BROWSER_OK", exact=True).first.wait_for(
                         state="attached", timeout=10000)
+                    await device.click()
+                    tabs = page.get_by_role("tab")
+                    await expect(tabs).to_have_count(2)
+                    await expect(page.locator(".session-tab.ready")).to_have_count(2)
+                    for index in range(2):
+                        panel_id = await tabs.nth(index).get_attribute("aria-controls")
+                        tab_id = await tabs.nth(index).get_attribute("id")
+                        assert panel_id and await page.locator(f"#{panel_id}").get_attribute("aria-labelledby") == tab_id
+                    await tabs.nth(1).press("ArrowLeft")
+                    await expect(tabs.first).to_have_attribute("aria-selected", "true")
+                    await tabs.first.press("End")
+                    await expect(tabs.nth(1)).to_have_attribute("aria-selected", "true")
+                    await tabs.nth(1).press("Home")
+                    await expect(tabs.first).to_have_attribute("aria-selected", "true")
+                    await tabs.first.press("ArrowRight")
+                    await expect(tabs.nth(1)).to_have_attribute("aria-selected", "true")
+                    await page.evaluate("() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))")
+                    assert await tabs.nth(1).evaluate("element => document.activeElement === element")
+                    await page.get_by_role("button", name="Close session").click()
+                    await expect(tabs).to_have_count(1)
                     assert not external_requests, f"Web UI requested external assets: {external_requests}"
                     assert not errors, f"Browser console errors before restart: {errors}"
 
