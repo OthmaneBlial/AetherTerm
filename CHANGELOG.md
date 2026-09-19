@@ -10,6 +10,7 @@ There is no GitHub release for this version. The entries below describe work in 
 - Interactive xterm.js terminal with isolated PTYs, resize and explicit close; local loopback demo, wheel, non-root server image and Linux x86_64 agent binary builds.
 - Python, Chromium, container and binary smoke checks in CI; dependency and secret scans, hashed Python dependency locks and real browser screenshots.
 - Architecture, threat model, deployment, operations, installation and contribution guides.
+- Tag-gated release automation that waits for the matching CI run, rebuilds the declared artifacts and publishes their SHA-256 manifest; fresh-clone onboarding verification on macOS.
 
 ### Security and behavior changes from the original prototype
 
