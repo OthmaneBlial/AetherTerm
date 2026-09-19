@@ -161,7 +161,7 @@ def main():
 
     try:
         asyncio.run(run_agent())
-    except asyncio.CancelledError:
+    except (asyncio.CancelledError, KeyboardInterrupt):
         pass
 
 if __name__ == '__main__':

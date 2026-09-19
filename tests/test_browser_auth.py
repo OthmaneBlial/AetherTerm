@@ -489,6 +489,60 @@ class BrowserAuthTests(unittest.IsolatedAsyncioTestCase):
                     self.fail("Agent did not stop within five seconds after SIGTERM")
             agent_log.close()
 
+    async def test_agent_sigint_closes_its_live_shell(self):
+        agent, agent_log = self.start_real_agent()
+        origin = f"http://127.0.0.1:{self.port}"
+        status, headers = self.request("POST", "/login", "password=a-test-password-only", {"Origin": origin})
+        self.assertEqual(status, 303)
+        cookie = headers["set-cookie"].split(";", 1)[0]
+        try:
+            async with websockets.connect(f"ws://127.0.0.1:{self.port}/ws", origin=origin,
+                                          additional_headers={"Cookie": cookie}) as browser:
+                for _ in range(100):
+                    await browser.send(json.dumps({"type": "list_devices"}))
+                    if "test-agent" in json.loads(await browser.recv())["devices"]:
+                        break
+                    await asyncio.sleep(0.1)
+                else:
+                    self.fail("Agent did not register")
+                await browser.send(json.dumps({"type": "start_session", "deviceId": "test-agent"}))
+                session_id = json.loads(await asyncio.wait_for(browser.recv(), 3))["sessionId"]
+                self.assertEqual(json.loads(await asyncio.wait_for(browser.recv(), 3))["type"], "session_ready")
+                command = base64.b64encode(b"printf 'SHELL_PID_%s\\n' \"$$\"\n").decode()
+                await browser.send(json.dumps({"type": "term_input", "sessionId": session_id, "input": command}))
+                output = b""
+                for _ in range(40):
+                    message = json.loads(await asyncio.wait_for(browser.recv(), 2))
+                    if message["type"] == "term_data":
+                        output += base64.b64decode(message["data"])
+                    match = re.search(rb"SHELL_PID_(\d+)", output)
+                    if match:
+                        shell_pid = int(match.group(1))
+                        break
+                else:
+                    self.fail("No live shell PID")
+                os.killpg(agent.pid, signal.SIGINT)
+                for _ in range(40):
+                    message = json.loads(await asyncio.wait_for(browser.recv(), 3))
+                    if message["type"] == "session_closed" and message["sessionId"] == session_id:
+                        break
+                else:
+                    self.fail("No session_closed after agent SIGINT")
+                await asyncio.to_thread(agent.wait, 5)
+                for _ in range(30):
+                    try:
+                        os.kill(shell_pid, 0)
+                    except ProcessLookupError:
+                        break
+                    await asyncio.sleep(0.1)
+                else:
+                    self.fail("Shell survived agent SIGINT")
+        finally:
+            if agent.poll() is None:
+                os.killpg(agent.pid, signal.SIGKILL)
+                agent.wait(timeout=5)
+            agent_log.close()
+
     async def test_unready_agent_session_times_out_and_frees_capacity(self):
         origin = f"http://127.0.0.1:{self.port}"
         status, headers = self.request("POST", "/login", "password=a-test-password-only", {"Origin": origin})
