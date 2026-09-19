@@ -14,11 +14,11 @@ These are real browser captures from the [Ubuntu CI run for `dbaf5e9`](https://g
 
 - A Python FastAPI server with browser (`/ws`) and agent (`/client`) WebSocket endpoints.
 - A Python agent that creates a `/bin/bash` PTY on request.
-- An operator password login and a bundled xterm.js console that lists enrolled devices and opens interactive shells. Sessions are tied to the browser WebSocket that opened them.
+- An operator password login and a bundled xterm.js console that lists enrolled devices and opens interactive shells. Sessions are tied to the browser WebSocket that opened them. The terminal toolbar can send Ctrl+C to a foreground process.
 - Device-bound agent credentials stored in owner-readable files, with server-side rotation and revocation.
 - Agent reconnection attempts after connection failures, plus isolated PTYs for simultaneous local sessions. Existing shells close after disconnection; a returning agent needs a new session.
 
-The browser terminal uses locally bundled xterm.js. Unicode, ANSI colors, `less`, Ctrl+C and resize have been exercised on macOS in Chrome; the full terminal interaction set and Linux behavior still need validation. The page derives its WebSocket URL from the page origin, but remote HTTPS/WSS deployment has not been validated outside a local proxy test. Operator and agent credentials are created outside the repository; no working defaults are shipped.
+The browser terminal uses locally bundled xterm.js. Unicode paste, ANSI colors, `less`, the Ctrl+C toolbar action and resize have been exercised on macOS in Chrome. The Linux Chromium CI journey also checks shell output, Unicode rendering and the Ctrl+C action; `vim`, arrow keys and real touch input still need validation. The page derives its WebSocket URL from the page origin, but remote HTTPS/WSS deployment has not been validated outside a local proxy test. Operator and agent credentials are created outside the repository; no working defaults are shipped.
 
 ## Loopback-only development run
 
@@ -72,6 +72,6 @@ AetherTerm does not speak SSH. Compatibility, security and ease-of-use compariso
 | Browser access | Password login, cookie session, same-origin WebSocket and negative cross-browser integration test. The sole operator can access every enrolled active device. | Expiry/revocation under load, external deployment and independent security review. |
 | Agent identity | Per-device credential-file enrollment, rotation and revocation tested locally. | Remote encrypted transport, Linux installation and operating guidance. |
 | Transport | Remote cleartext refused in code; direct TLS and a local Caddy HTTPS/WSS proxy test with certificate validation passed. | Public certificate, external network and graphical browser validation. |
-| Packaging and automation | A wheel installed in clean Python 3.13 environments served its bundled UI and completed an authorized PTY round trip on macOS and an Ubuntu 24.04 CI runner. The [CI run for `f0b1cdd`](https://github.com/OthmaneBlial/AetherTerm/actions/runs/35444767496) passed. No published release artifact is verified. | Browser automation, security scans, tested downloads and release checks. |
+| Packaging and automation | A wheel installed in clean Python 3.13 environments served its bundled UI and completed an authorized PTY round trip on macOS and Ubuntu 24.04 CI. A non-root server container, dependency scans and the Chromium journey passed in the [CI run for `dbaf5e9`](https://github.com/OthmaneBlial/AetherTerm/actions/runs/35446357041). No published release artifact is verified. | Standalone Linux agent, tested downloads, review gates and release checks. |
 
 The MIT license is in [LICENSE](LICENSE). Contributions are welcome once the security and test setup are documented; please avoid deploying this revision to a reachable network. The complete sequence is tracked in [ROADMAP.md](ROADMAP.md).
