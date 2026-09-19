@@ -1,5 +1,7 @@
 # AetherTerm
 
+[![CI](https://github.com/OthmaneBlial/AetherTerm/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/OthmaneBlial/AetherTerm/actions/workflows/ci.yml)
+
 An early prototype that relays a shell on an agent machine to a browser through a FastAPI WebSocket server. It is **not ready for network deployment**.
 
 ![AetherTerm desktop console running a real Linux shell in Chromium](assets/screenshots/desktop.png)
