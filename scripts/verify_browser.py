@@ -147,10 +147,11 @@ async def main():
                     await page.keyboard.press("Enter")
                     await page.locator(".xterm-screen").get_by_text("VIM - Vi IMproved", exact=False).first.wait_for(
                         state="attached", timeout=10000)
-                    await page.keyboard.type("vim -Nu NONE -n /tmp/aetherterm-browser-vim.txt")
+                    vim_file = directory / "vim-proof.txt"
+                    await page.keyboard.type(f"vim -Nu NONE -n {vim_file}")
                     await page.keyboard.press("Enter")
                     await page.wait_for_function("""() =>
-                        document.querySelector('.xterm-screen').textContent.includes('aetherterm-browser-vim.txt')
+                        document.querySelector('.xterm-screen').textContent.includes('vim-proof.txt')
                     """, timeout=10000)
                     await page.wait_for_timeout(400)
                     await page.keyboard.press("i")
@@ -164,10 +165,20 @@ async def main():
                     await page.wait_for_timeout(100)
                     await page.keyboard.type(":wq")
                     await page.keyboard.press("Enter")
-                    await page.keyboard.type("cat /tmp/aetherterm-browser-vim.txt")
+                    for _ in range(100):
+                        if vim_file.is_file() and vim_file.read_text(encoding="utf-8").strip() == "VIM_BROWSER_OK":
+                            break
+                        await asyncio.sleep(0.1)
+                    else:
+                        print("Vim terminal rows:", repr(await page.locator(".xterm-rows").inner_text()),
+                              file=sys.stderr)
+                        raise AssertionError("Vim did not save the expected file through the browser PTY")
+                    await page.wait_for_timeout(200)
+                    await page.keyboard.type(f"cat {vim_file}")
                     await page.keyboard.press("Enter")
-                    await page.locator(".xterm-screen").get_by_text("VIM_BROWSER_OK", exact=True).first.wait_for(
-                        state="attached", timeout=10000)
+                    await page.wait_for_function("""() =>
+                        document.querySelector('.xterm-screen').textContent.includes('VIM_BROWSER_OK')
+                    """, timeout=10000)
                     await page.keyboard.type("cd /tmp")
                     await page.keyboard.press("Enter")
                     await page.keyboard.type("clear")
