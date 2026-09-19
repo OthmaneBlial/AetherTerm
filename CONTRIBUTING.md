@@ -25,6 +25,8 @@ git diff --exit-code -- web/assets
 
 The integration suite starts temporary server and agent processes on loopback, creates disposable credentials outside the repository, and exercises real PTYs. It does not require a public server. The browser journey also runs in Linux CI with Chromium; `scripts/verify_browser.py` needs Playwright and its Chromium runtime if run manually. Keep test credentials in temporary files, never in Git.
 
+The [test matrix](docs/TEST_MATRIX.md) maps each security and terminal boundary to its checks and names the limits of the evidence. Add a regression there when a new failure mode changes the contract.
+
 `requirements.lock` pins and hashes Python 3.13 development dependencies; `requirements-runtime.lock` covers installed server and agent dependencies; `requirements-freeze.lock` covers the Linux binary builder too. They were generated with pip-tools 7.6.1 using `pip-compile --strip-extras --generate-hashes` with the appropriate `--extra dev` or `--extra freeze` (plus `--allow-unsafe` for the freeze lock's setuptools dependency). Refresh all three when dependency constraints change, review the diff, and confirm clean installs on the declared CI platform before merging.
 
 For a manual first shell, follow [docs/QUICKSTART.md](docs/QUICKSTART.md). The [architecture](docs/ARCHITECTURE.md), [threat model](docs/THREAT_MODEL.md) and [operations guide](docs/OPERATIONS.md) explain the current contracts. Remote deployment claims require the separate checks in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).

@@ -29,6 +29,8 @@ navigateur -- HTTP(S) /login --> serveur FastAPI
 
 `server.main.create_app()` crée un état indépendant par instance à partir de `ServerConfig`. Cette configuration refuse au démarrage un chemin partagé par les identités opérateur et agent ou un paquet d'assets Web incomplet. Le lancement documenté utilise un seul worker : plusieurs workers ne partagent ni les agents ni les sessions. Le CLI `aetherterm-server` écoute uniquement `127.0.0.1` et fixe la confiance des en-têtes de proxy à cette adresse. La terminaison TLS doit être effectuée par un proxy de confiance sur la même machine ; voir [DEPLOYMENT.md](DEPLOYMENT.md). HTTP/WS en clair est accepté uniquement pour un pair sur boucle locale. Un accès distant réel avec certificat public n'a pas encore été validé.
 
+L'agent regroupe ses paramètres dans `AgentConfig` et vérifie avant connexion l'hôte/port, l'ID d'appareil, la description et la cohérence de `--tls`/`--ca-file`. Le fichier de jeton est lu seulement après cette validation, avec contrôle du propriétaire et des permissions. Les valeurs sont alors passées à la boucle de reconnexion et à `PtySession` ; aucun shell n'est créé par l'import d'un module.
+
 ## Limites et défaillances prévues
 
 - Le navigateur et l'agent négocient le sous-protocole WebSocket `aetherterm.v1` avant tout message. Une connexion qui ne l'annonce pas est refusée. Chaque trame JSON reçue par le serveur est validée et limitée à 64 Kio ; les fragments de terminal sont limités à 16 Kio, les dimensions, sessions opérateur, connexions ouvertes et sessions PTY sont bornées. Le code impose aussi des limites par adresse IP, un délai de démarrage du shell et des envois serveur bornés. Ces limites ne remplacent pas une mesure de charge.
