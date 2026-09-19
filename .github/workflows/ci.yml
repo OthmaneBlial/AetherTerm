@@ -30,7 +30,10 @@ jobs:
       - name: Check disposable local demo setup and cleanup
         run: python -m scripts.demo_local --check
       - name: Check Linux user service syntax
-        run: systemd-analyze verify packaging/aetherterm-agent@.service
+        run: |
+          install -d -m 700 "$HOME/.local/share/aetherterm/venv/bin"
+          ln -s "$(command -v aetherterm-agent)" "$HOME/.local/share/aetherterm/venv/bin/aetherterm-agent"
+          systemd-analyze verify packaging/aetherterm-agent@.service
       - name: Build wheel and source archive
         run: python -m build --wheel --sdist
       - name: Check installed wheel outside checkout
