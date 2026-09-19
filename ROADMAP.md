@@ -62,7 +62,7 @@ Une case est cochée seulement après satisfaction de **tous** les critères d'a
 - [ ] 3.1 Premier démarrage jusqu'au shell — appareils enrôlés hors ligne, description, dernière activité de ce processus, étapes d'enrôlement et récupération d'état vérifiés dans Chrome ; installation Linux propre et 3 à 5 essais observés restent nécessaires.
 - [ ] 3.2 Interface accessible et responsive — vrais boutons, focus et sortie lisible par lecteur d'écran ; débordement horizontal absent à 320, 375, 390, 768 et 1280 px dans Chrome ; interaction tactile réelle et revue clavier complète à faire.
 - [ ] 3.3 Assets Web maîtrisés et identité visuelle — xterm.js 6.0.0 et FitAddon 0.11.0 figés, build local et licences incluses ; favicon et CSP vérifiés avec connexion, PTY et déconnexion dans Chrome ; wheel installé en venv macOS propre avec assets servis localement et PTY réel ; image et essai hors ligne explicite encore requis.
-- [ ] 4.1 Architecture et configuration testables.
+- [ ] 4.1 Architecture et configuration testables — factory FastAPI et état par instance avec test d'isolation ajoutés ; configuration typée complète, protocole versionné et logs structurés encore requis.
 - [ ] 4.2 Suite de tests utile.
 - [ ] 4.3 Dépendances et maintenance vérifiables — manifeste Python et dépendances directes figées ; résolution transitive, matrice Python/OS, lint, scans et CI encore requis.
 - [ ] 5.1 Installation et déploiement reproductibles.

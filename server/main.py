@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, WebSocket
+from fastapi import APIRouter, FastAPI, Request, WebSocket
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, RedirectResponse
 import asyncio
@@ -6,26 +6,18 @@ import json
 from pathlib import Path
 from importlib.resources import files
 import re
+import time
 import uuid
 from urllib.parse import parse_qs
 
 from .agents import AgentRegistry, agents_file
 from .auth import COOKIE_NAME, SESSION_SECONDS, OperatorAuth, operator_file
 from .network import transport_allowed
-from .limits import (ConnectionLimiter, SlidingWindowLimiter, MAX_CONNECTED_AGENTS,
+from .limits import (SlidingWindowLimiter, MAX_CONNECTED_AGENTS,
                      MAX_SESSIONS_PER_AGENT, MAX_SESSIONS_PER_BROWSER, MAX_SESSIONS_TOTAL,
                      SESSION_START_TIMEOUT)
 from .protocol import ProtocolError, parse_message
-
-app = FastAPI()
-operator_auth = OperatorAuth(operator_file())
-agent_registry = AgentRegistry(agents_file())
-
-import os
-import time
-
-browser_connections = ConnectionLimiter()
-agent_connections = ConnectionLimiter()
+from .state import ServerState
 
 def log_security_event(event: str, client_ip: str = "unknown", details: str = ""):
     """Log security events"""
@@ -36,21 +28,8 @@ try:
     web_dir = Path(str(files("aetherterm_assets")))
 except ModuleNotFoundError:
     web_dir = Path(__file__).resolve().parents[1] / "web"
-print(f"Web directory path: {web_dir}")
-print(f"Web directory exists: {os.path.exists(web_dir)}")
-if os.path.exists(web_dir):
-    app.mount("/web", StaticFiles(directory=web_dir, html=True), name="web")
-    print("Web directory mounted successfully")
-else:
-    print("Web directory not found!")
 
-print("AetherTerm prototype: operator and device credentials are required.")
-
-devices = {}  # device_id: websocket
-device_credentials = {}  # device_id: credential hash for revocation checks
-sessions = {}  # session_id: {'device_id': str, 'web_ws': WebSocket, 'ready': bool}
-device_last_seen = {}  # device_id: Unix timestamp, only for this server process
-device_descriptions = {}  # agent-supplied fallback, never an identity claim
+router = APIRouter()
 
 SEND_TIMEOUT = 3
 
@@ -64,17 +43,17 @@ async def send_error(websocket: WebSocket, message: str) -> None:
     await send_json(websocket, {"type": "error", "message": message})
 
 
-async def send_to_browser(session_id: str, message: dict) -> bool:
+async def send_to_browser(state: ServerState, session_id: str, message: dict) -> bool:
     """Drop one stalled browser session without taking down its agent."""
-    session = sessions.get(session_id)
+    session = state.sessions.get(session_id)
     if session is None:
         return False
     try:
         await send_json(session['web_ws'], message)
         return True
     except Exception:
-        sessions.pop(session_id, None)
-        device_socket = devices.get(session['device_id'])
+        state.sessions.pop(session_id, None)
+        device_socket = state.devices.get(session['device_id'])
         if device_socket:
             try:
                 await send_json(device_socket, {"type": "close_session", "sessionId": session_id})
@@ -83,24 +62,24 @@ async def send_to_browser(session_id: str, message: dict) -> bool:
         return False
 
 
-def session_capacity(websocket: WebSocket, device_id: str) -> bool:
-    if len(sessions) >= MAX_SESSIONS_TOTAL:
+def session_capacity(state: ServerState, websocket: WebSocket, device_id: str) -> bool:
+    if len(state.sessions) >= MAX_SESSIONS_TOTAL:
         return False
-    if sum(session["web_ws"] is websocket for session in sessions.values()) >= MAX_SESSIONS_PER_BROWSER:
+    if sum(session["web_ws"] is websocket for session in state.sessions.values()) >= MAX_SESSIONS_PER_BROWSER:
         return False
-    return sum(session["device_id"] == device_id for session in sessions.values()) < MAX_SESSIONS_PER_AGENT
+    return sum(session["device_id"] == device_id for session in state.sessions.values()) < MAX_SESSIONS_PER_AGENT
 
 
-async def expire_pending_session(session_id: str) -> None:
+async def expire_pending_session(state: ServerState, session_id: str) -> None:
     await asyncio.sleep(SESSION_START_TIMEOUT)
-    session = sessions.get(session_id)
+    session = state.sessions.get(session_id)
     if session is None or session['ready']:
         return
-    await send_to_browser(session_id, {"type": "session_closed", "sessionId": session_id,
+    await send_to_browser(state, session_id, {"type": "session_closed", "sessionId": session_id,
                                        "reason": "Shell did not become ready"})
-    session = sessions.pop(session_id, None)
+    session = state.sessions.pop(session_id, None)
     if session:
-        device_socket = devices.get(session['device_id'])
+        device_socket = state.devices.get(session['device_id'])
         if device_socket:
             try:
                 await send_json(device_socket, {"type": "close_session", "sessionId": session_id})
@@ -108,21 +87,21 @@ async def expire_pending_session(session_id: str) -> None:
                 pass
 
 
-def active_device(device_id: str) -> bool:
-    token_hash = device_credentials.get(device_id)
-    return bool(device_id in devices and token_hash and agent_registry.is_active(device_id, token_hash))
+def active_device(state: ServerState, device_id: str) -> bool:
+    token_hash = state.device_credentials.get(device_id)
+    return bool(device_id in state.devices and token_hash and state.agent_registry.is_active(device_id, token_hash))
 
 
 def same_origin(request: Request) -> bool:
     return request.headers.get("origin") == f"{request.url.scheme}://{request.headers.get('host')}"
 
 
-def login_page(message: str = "") -> HTMLResponse:
+def login_page(state: ServerState, message: str = "") -> HTMLResponse:
     notice = '<p class="error" role="alert">Sign in failed. Check the password and try again.</p>' if message else ""
-    if not operator_auth.configured():
+    if not state.operator_auth.configured():
         notice = ('<p class="error" role="alert">Operator setup required. Run '
                   '<code>python -m server.admin init</code> on the server, then restart it.</p>')
-    body = (Path(web_dir) / "login.html").read_text(encoding="utf-8").replace("<!-- SERVER_NOTICE -->", notice)
+    body = (state.web_dir / "login.html").read_text(encoding="utf-8").replace("<!-- SERVER_NOTICE -->", notice)
     return HTMLResponse(body, headers={"Cache-Control": "no-store"})
 
 
@@ -136,11 +115,11 @@ def content_security_policy(request: Request) -> str:
             f"img-src 'self' data:; font-src 'self'; connect-src 'self'{websocket_source}")
 
 
-@app.middleware("http")
 async def protect_web(request: Request, call_next):
+    state: ServerState = request.app.state.runtime
     if not transport_allowed(request.url.scheme, request.client.host if request.client else "unknown"):
         return PlainTextResponse("HTTPS required for remote access", status_code=403)
-    if request.url.path.startswith("/web") and not operator_auth.session_key(request.cookies.get(COOKIE_NAME)):
+    if request.url.path.startswith("/web") and not state.operator_auth.session_key(request.cookies.get(COOKIE_NAME)):
         return RedirectResponse("/login", status_code=303)
     response = await call_next(request)
     response.headers["Content-Security-Policy"] = content_security_policy(request)
@@ -152,36 +131,38 @@ async def protect_web(request: Request, call_next):
     return response
 
 
-@app.get("/favicon.svg")
-async def favicon():
-    return FileResponse(Path(web_dir) / "favicon.svg", media_type="image/svg+xml")
+@router.get("/favicon.svg")
+async def favicon(request: Request):
+    return FileResponse(request.app.state.runtime.web_dir / "favicon.svg", media_type="image/svg+xml")
 
 
-@app.get("/login")
+@router.get("/login")
 async def show_login(request: Request):
-    if operator_auth.session_key(request.cookies.get(COOKIE_NAME)):
+    state: ServerState = request.app.state.runtime
+    if state.operator_auth.session_key(request.cookies.get(COOKIE_NAME)):
         return RedirectResponse("/web/", status_code=303)
-    return login_page()
+    return login_page(state)
 
 
-@app.post("/login")
+@router.post("/login")
 async def sign_in(request: Request):
+    state: ServerState = request.app.state.runtime
     if not same_origin(request):
         return PlainTextResponse("Forbidden", status_code=403)
-    if not operator_auth.configured():
+    if not state.operator_auth.configured():
         return PlainTextResponse("Operator setup required", status_code=503)
     client_ip = request.client.host if request.client else "unknown"
-    if not operator_auth.allow_login(client_ip):
+    if not state.operator_auth.allow_login(client_ip):
         return PlainTextResponse("Too many attempts", status_code=429)
     body = await request.body()
     if len(body) > 4096:
         return PlainTextResponse("Request too large", status_code=413)
     password = parse_qs(body.decode("utf-8", errors="replace")).get("password", [""])[0]
-    if not operator_auth.verify_password(password):
-        response = login_page("invalid")
+    if not state.operator_auth.verify_password(password):
+        response = login_page(state, "invalid")
         response.status_code = 401
         return response
-    token = operator_auth.create_session()
+    token = state.operator_auth.create_session()
     response = RedirectResponse("/web/", status_code=303)
     response.set_cookie(
         COOKIE_NAME, token, max_age=SESSION_SECONDS, httponly=True,
@@ -191,17 +172,26 @@ async def sign_in(request: Request):
     return response
 
 
-@app.post("/logout")
+@router.post("/logout")
 async def sign_out(request: Request):
+    state: ServerState = request.app.state.runtime
     if not same_origin(request):
         return PlainTextResponse("Forbidden", status_code=403)
-    await operator_auth.revoke(request.cookies.get(COOKIE_NAME))
+    await state.operator_auth.revoke(request.cookies.get(COOKIE_NAME))
     response = RedirectResponse("/login", status_code=303)
     response.delete_cookie(COOKIE_NAME, path="/")
     return response
 
-@app.websocket("/ws")
+@router.websocket("/ws")
 async def web_websocket(websocket: WebSocket):
+    state: ServerState = websocket.app.state.runtime
+    operator_auth = state.operator_auth
+    agent_registry = state.agent_registry
+    browser_connections = state.browser_connections
+    devices = state.devices
+    sessions = state.sessions
+    device_last_seen = state.device_last_seen
+    device_descriptions = state.device_descriptions
     client_ip = websocket.client.host if websocket.client else "unknown"
     if not transport_allowed(websocket.url.scheme, client_ip):
         await websocket.close(code=1008, reason="WSS required for remote access")
@@ -250,7 +240,7 @@ async def web_websocket(websocket: WebSocket):
             log_security_event("WEB_MESSAGE", client_ip, f"Type: {msg.get('type', 'unknown')}")
 
             if msg['type'] == 'list_devices':
-                device_list = [device_id for device_id in devices if active_device(device_id)]
+                device_list = [device_id for device_id in devices if active_device(state, device_id)]
                 device_details = []
                 for record in agent_registry.visible_devices():
                     device_id = record["deviceId"]
@@ -264,10 +254,10 @@ async def web_websocket(websocket: WebSocket):
                                             "deviceDetails": device_details})
             elif msg['type'] == 'start_session':
                 device_id = msg['deviceId']
-                if not active_device(device_id):
+                if not active_device(state, device_id):
                     await send_error(websocket, "Device not connected")
                     continue
-                if not session_capacity(websocket, device_id):
+                if not session_capacity(state, websocket, device_id):
                     await send_error(websocket, "Session limit reached")
                     continue
                 session_id = str(uuid.uuid4())
@@ -276,16 +266,16 @@ async def web_websocket(websocket: WebSocket):
                 try:
                     await send_json(devices[device_id], {"type": "login_request", "sessionId": session_id})
                 except Exception:
-                    await send_to_browser(session_id, {"type": "session_closed", "sessionId": session_id,
+                    await send_to_browser(state, session_id, {"type": "session_closed", "sessionId": session_id,
                                                        "reason": "Agent unavailable"})
                     sessions.pop(session_id, None)
                     continue
-                asyncio.create_task(expire_pending_session(session_id))
+                asyncio.create_task(expire_pending_session(state, session_id))
                 log_security_event("SESSION_STARTED", client_ip, f"Session: {session_id}, Device: {device_id}")
             elif msg['type'] == 'term_input':
                 session_id = msg['sessionId']
                 input_b64 = msg['input']
-                if session_id not in sessions or sessions[session_id]['web_ws'] is not websocket or not active_device(sessions[session_id]['device_id']):
+                if session_id not in sessions or sessions[session_id]['web_ws'] is not websocket or not active_device(state, sessions[session_id]['device_id']):
                     log_security_event("INVALID_SESSION", client_ip)
                     await send_error(websocket, "Session unavailable")
                     continue
@@ -298,7 +288,7 @@ async def web_websocket(websocket: WebSocket):
                 session_id = msg['sessionId']
                 cols = msg.get('cols', 80)
                 rows = msg.get('rows', 24)
-                if session_id in sessions and sessions[session_id]['web_ws'] is websocket and sessions[session_id]['ready'] and active_device(sessions[session_id]['device_id']):
+                if session_id in sessions and sessions[session_id]['web_ws'] is websocket and sessions[session_id]['ready'] and active_device(state, sessions[session_id]['device_id']):
                     device_id = sessions[session_id]['device_id']
                     await send_json(devices[device_id], {"type": "resize", "sessionId": session_id, "cols": cols, "rows": rows})
                 else:
@@ -331,8 +321,16 @@ async def web_websocket(websocket: WebSocket):
                 except Exception:
                     pass
 
-@app.websocket("/client")
+@router.websocket("/client")
 async def client_websocket(websocket: WebSocket):
+    state: ServerState = websocket.app.state.runtime
+    agent_registry = state.agent_registry
+    agent_connections = state.agent_connections
+    devices = state.devices
+    device_credentials = state.device_credentials
+    sessions = state.sessions
+    device_last_seen = state.device_last_seen
+    device_descriptions = state.device_descriptions
     client_ip = websocket.client.host if websocket.client else "unknown"
     if not transport_allowed(websocket.url.scheme, client_ip):
         await websocket.close(code=1008, reason="WSS required for remote access")
@@ -416,7 +414,7 @@ async def client_websocket(websocket: WebSocket):
                 session_id = msg['sessionId']
                 data_b64 = msg['data']
                 if session_id in sessions and sessions[session_id]['device_id'] == device_id and sessions[session_id]['ready']:
-                    if await send_to_browser(session_id, {"type": "term_data", "sessionId": session_id, "data": data_b64}):
+                    if await send_to_browser(state, session_id, {"type": "term_data", "sessionId": session_id, "data": data_b64}):
                         log_security_event("TERM_DATA_FORWARDED", client_ip, f"Session: {session_id}")
                 else:
                     log_security_event("INVALID_SESSION_DATA", client_ip, f"Session: {session_id}")
@@ -426,13 +424,13 @@ async def client_websocket(websocket: WebSocket):
                 session = sessions.get(session_id)
                 if session and session['device_id'] == device_id and not session['ready']:
                     session['ready'] = True
-                    await send_to_browser(session_id, {"type": "session_ready", "sessionId": session_id})
+                    await send_to_browser(state, session_id, {"type": "session_ready", "sessionId": session_id})
 
             elif msg['type'] == 'session_exit':
                 session_id = msg['sessionId']
                 session = sessions.get(session_id)
                 if session and session['device_id'] == device_id:
-                    await send_to_browser(session_id, {"type": "session_closed", "sessionId": session_id})
+                    await send_to_browser(state, session_id, {"type": "session_closed", "sessionId": session_id})
                     sessions.pop(session_id, None)
 
             elif msg['type'] == 'heartbeat':
@@ -456,7 +454,28 @@ async def client_websocket(websocket: WebSocket):
                         pass
         log_security_event("CLIENT_CONNECTION_CLOSED", client_ip, f"Device: {device_id}")
 
-@app.get("/")
+@router.get("/")
 async def root(request: Request):
-    destination = "/web/" if operator_auth.session_key(request.cookies.get(COOKIE_NAME)) else "/login"
+    state: ServerState = request.app.state.runtime
+    destination = "/web/" if state.operator_auth.session_key(request.cookies.get(COOKIE_NAME)) else "/login"
     return RedirectResponse(destination, status_code=303)
+
+
+def create_app(*, operator_path: Path | None = None, agents_path: Path | None = None,
+               assets_path: Path | None = None) -> FastAPI:
+    application = FastAPI()
+    state = ServerState(
+        operator_auth=OperatorAuth(operator_path or operator_file()),
+        agent_registry=AgentRegistry(agents_path or agents_file()),
+        web_dir=assets_path or web_dir,
+    )
+    if not state.web_dir.is_dir():
+        raise RuntimeError(f"AetherTerm Web assets not found: {state.web_dir}")
+    application.state.runtime = state
+    application.middleware("http")(protect_web)
+    application.mount("/web", StaticFiles(directory=state.web_dir, html=True), name="web")
+    application.include_router(router)
+    return application
+
+
+app = create_app()
