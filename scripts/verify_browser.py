@@ -71,7 +71,10 @@ async def main():
                                      stdout=agent_log, stderr=subprocess.STDOUT, start_new_session=True)
 
             async with async_playwright() as playwright:
-                browser = await playwright.chromium.launch(headless=True)
+                browser_name = os.environ.get("AETHERTERM_BROWSER", "chromium")
+                if browser_name not in {"chromium", "firefox", "webkit"}:
+                    raise ValueError(f"Unsupported browser: {browser_name}")
+                browser = await getattr(playwright, browser_name).launch(headless=True)
                 page = await browser.new_page(viewport={"width": 1280, "height": 800})
                 errors = []
                 external_requests = []
@@ -284,7 +287,8 @@ async def main():
                 stop(server)
                 server_log.close()
                 agent_log.close()
-    print("Chromium login, PTY, restart, reauthentication, Unicode output, interrupt, mobile layout and sign-out: PASS")
+    print(f"{browser_name} login, PTY, restart, reauthentication, Unicode output, "
+          "interrupt, mobile layout and sign-out: PASS")
 
 
 if __name__ == "__main__":
