@@ -314,6 +314,21 @@ class BrowserAuthTests(unittest.IsolatedAsyncioTestCase):
                 self.assertNotEqual(first_pid, second_pid)
                 self.assertNotIn("SECOND_", first_output)
                 self.assertNotIn("FIRST_", second_output)
+                split_unicode = b"printf '\\303'; sleep 0.2; printf '\\251\\n'\n"
+                await first.send(json.dumps({"type": "term_input", "sessionId": first_id,
+                                             "input": base64.b64encode(split_unicode).decode()}))
+                received = b""
+                chunks = []
+                for _ in range(40):
+                    message = json.loads(await asyncio.wait_for(first.recv(), 2))
+                    if message["type"] == "term_data":
+                        chunk = base64.b64decode(message["data"])
+                        chunks.append(chunk)
+                        received += chunk
+                    if b"\xc3\xa9" in received:
+                        break
+                self.assertIn(b"\xc3\xa9", received)
+                self.assertTrue(any(b"\xc3" in chunk and b"\xa9" not in chunk for chunk in chunks))
                 await first.send(json.dumps({"type": "close_session", "sessionId": first_id}))
                 self.assertEqual(json.loads(await first.recv())["type"], "session_closed")
                 for _ in range(30):

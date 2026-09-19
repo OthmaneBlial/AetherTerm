@@ -1,407 +1,59 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
-    <meta charset="UTF-8" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1.0"
-    />
-    <title>AetherTerm</title>
-    <script src="https://cdn.jsdelivr.net/npm/vue@3.3.4/dist/vue.global.js"></script>
-    <style>
-      body {
-        font-family: "Courier New",
-          monospace;
-        margin: 0;
-        padding: 20px;
-        background: #1a1a1a;
-        color: #fff;
-      }
-      .container {
-        max-width: 1200px;
-        margin: 0 auto;
-      }
-      h1 {
-        color: #00ff00;
-        text-align: center;
-        margin-bottom: 30px;
-        text-shadow: 0 0 10px #00ff00;
-      }
-      .device-section {
-        margin-bottom: 20px;
-      }
-      .device-list {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 10px;
-        margin-bottom: 20px;
-      }
-      .device-item {
-        background: #2d2d2d;
-        border: 1px solid #444;
-        padding: 10px 15px;
-        border-radius: 5px;
-        cursor: pointer;
-        transition: all 0.3s ease;
-      }
-      .device-item:hover {
-        background: #444;
-        border-color: #00ff00;
-        transform: translateY(-2px);
-      }
-      .terminal-section {
-        background: #000;
-        border: 2px solid #333;
-        border-radius: 8px;
-        padding: 20px;
-        margin-top: 20px;
-      }
-      .session-info {
-        color: #00ff00;
-        margin-bottom: 15px;
-        font-size: 14px;
-      }
-      #terminal {
-        width: 100%;
-        height: 350px;
-        background: #000;
-        color: #0f0;
-        border: 1px solid #444;
-        padding: 15px;
-        font-family: "Courier New",
-          monospace;
-        font-size: 14px;
-        line-height: 1.4;
-        white-space: pre-wrap;
-        overflow-y: auto;
-        border-radius: 4px;
-        margin-bottom: 15px;
-      }
-      .input-section {
-        display: flex;
-        gap: 10px;
-        align-items: center;
-      }
-      #input {
-        flex: 1;
-        background: #1a1a1a;
-        color: #0f0;
-        border: 1px solid #444;
-        padding: 10px;
-        font-family: "Courier New",
-          monospace;
-        font-size: 14px;
-        border-radius: 4px;
-      }
-      #input:focus {
-        outline: none;
-        border-color: #00ff00;
-        box-shadow: 0 0 5px #00ff00;
-      }
-      button {
-        background: #2d2d2d;
-        color: #fff;
-        border: 1px solid #444;
-        padding: 10px 20px;
-        border-radius: 4px;
-        cursor: pointer;
-        transition: all 0.3s ease;
-      }
-      button:hover {
-        background: #444;
-        border-color: #00ff00;
-      }
-      .status {
-        text-align: center;
-        margin: 20px 0;
-        color: #888;
-        font-style: italic;
-      }
-    </style>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#101719">
+    <title>AetherTerm · Operator console</title>
+    <link rel="stylesheet" href="/web/assets/app.css">
+    <script type="module" src="/web/assets/app.js"></script>
   </head>
   <body>
-    <div id="app" class="container">
-      <h1>AetherTerm</h1>
-
-      <div class="device-section">
-        <button @click="listDevices">
-          🔍 List Devices
-        </button>
-        <div
-          v-if="devices.length === 0"
-          class="status"
-        >
-          No devices connected. Start a
-          client first.
+    <div class="app-shell">
+      <header class="topbar">
+        <a class="brand" href="/web/" aria-label="AetherTerm home">
+          <span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span>
+          <span>AETHER<span class="brand-accent">TERM</span></span>
+        </a>
+        <div class="topbar-actions">
+          <span id="connection-status" class="connection-status" role="status">Connecting</span>
+          <form action="/logout" method="post"><button class="text-button" type="submit">Sign out</button></form>
         </div>
-        <div v-else class="device-list">
-          <div
-            v-for="device in devices"
-            :key="device"
-            class="device-item"
-            @click="startSession(device)"
-          >
-            🖥️ {{ device }}
+      </header>
+
+      <div class="workspace">
+        <aside class="sidebar" aria-label="Devices">
+          <div class="sidebar-heading">
+            <div><span class="eyebrow">FLEET / 01</span><h2>Devices</h2></div>
+            <button id="refresh-devices" class="icon-button" type="button" aria-label="Refresh devices" title="Refresh devices">↻</button>
           </div>
-        </div>
-      </div>
+          <p class="sidebar-note">Select an enrolled, connected agent to start a private shell.</p>
+          <div id="devices" class="devices" aria-live="polite"></div>
+          <div class="sidebar-footer"><span class="small-rule"></span><p>Shells run with the agent’s operating-system account. Close a session when you finish.</p></div>
+        </aside>
 
-      <div
-        v-if="sessionId"
-        class="terminal-section"
-      >
-        <div class="session-info">
-          🔗 Session: {{ sessionId }} · {{ sessionStatus }}
-        </div>
-        <button @click="closeSession">Close session</button>
-        <div
-          id="terminal"
-          @click="focusInput"
-          v-text="terminalContent"
-        ></div>
-        <div class="input-section">
-          <input
-            id="input"
-            v-model="currentInput"
-            @keydown="handleInput"
-            ref="inputField"
-            placeholder="Type a command..."
-          />
-          <button @click="sendCommand" :disabled="!sessionReady">
-            🚀 Send
-          </button>
-        </div>
+        <main class="main-panel">
+          <div class="page-heading">
+            <div><span class="eyebrow">OPERATOR / CONSOLE</span><h1>Remote workspace<span class="heading-dot">.</span></h1></div>
+            <span class="version-label">AETHERTERM · PROTOTYPE</span>
+          </div>
+          <div id="notice" class="notice" role="status" aria-live="polite">Connecting to the operator server…</div>
+          <div class="terminal-frame">
+            <div class="terminal-toolbar">
+              <div id="session-tabs" class="session-tabs" role="tablist" aria-label="Terminal sessions"></div>
+              <button id="close-session" class="close-button" type="button" disabled>Close session</button>
+            </div>
+            <div id="terminal-empty" class="terminal-empty">
+              <div class="empty-glyph" aria-hidden="true">&gt;_</div>
+              <h2>Your next shell starts here.</h2>
+              <p>Connect an agent, then choose it from the device list. No commands run until you type them.</p>
+              <span class="empty-hint">WAITING FOR A DEVICE<span class="cursor-block">▊</span></span>
+            </div>
+            <div id="terminals" class="terminals"></div>
+            <div class="terminal-footer"><span id="terminal-state">NO ACTIVE SESSION</span><span>UTF-8 · XTERM</span></div>
+          </div>
+        </main>
       </div>
     </div>
-
-    <script>
-      const { createApp } = Vue
-
-      createApp({
-        data() {
-          return {
-            devices: [],
-            ws: null,
-            sessionId: null,
-            sessionReady: false,
-            sessionStatus: "",
-            currentInput: "",
-            terminalContent: "",
-          }
-        },
-        mounted() {
-          const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:"
-          this.ws = new WebSocket(`${wsProtocol}//${window.location.host}/ws`)
-          this.ws.onopen = () => {
-            console.log("Connected to the AetherTerm operator console")
-          }
-          this.ws.onmessage =
-            this.onMessage.bind(this)
-          this.ws.onerror = (error) => {
-            console.log(
-              "WebSocket error:",
-              error
-            )
-          }
-        },
-        methods: {
-          listDevices() {
-            this.ws.send(
-              JSON.stringify({
-                type: "list_devices",
-              })
-            )
-          },
-          startSession(deviceId) {
-            this.ws.send(
-              JSON.stringify({
-                type: "start_session",
-                deviceId,
-              })
-            )
-          },
-          closeSession() {
-            if (this.sessionId && this.ws.readyState === WebSocket.OPEN) {
-              this.ws.send(JSON.stringify({ type: "close_session", sessionId: this.sessionId }))
-            }
-          },
-          focusInput() {
-            this.$refs.inputField.focus()
-          },
-          handleInput(event) {
-            if (event.key === "Enter") {
-              this.sendCommand()
-            }
-          },
-          sendCommand() {
-            if (
-              this.currentInput &&
-              this.sessionId &&
-              this.sessionReady &&
-              this.ws.readyState === WebSocket.OPEN
-            ) {
-              const command =
-                this.currentInput + "\n"
-              this.terminalContent +=
-                "$ " +
-                this.currentInput +
-                "\n"
-              this.ws.send(
-                JSON.stringify({
-                  type: "term_input",
-                  sessionId:
-                    this.sessionId,
-                  input: btoa(command),
-                })
-              )
-              this.currentInput = ""
-              this.$nextTick(() => {
-                this.$refs.inputField.focus()
-              })
-            }
-          },
-          onMessage(event) {
-            const msg = JSON.parse(
-              event.data
-            )
-            if (
-              msg.type === "device_list"
-            ) {
-              this.devices = msg.devices
-            } else if (
-              msg.type ===
-              "session_started"
-            ) {
-              this.sessionId =
-                msg.sessionId
-              this.sessionReady = false
-              this.sessionStatus = "Opening shell…"
-              this.terminalContent =
-                ""
-            } else if (msg.type === "session_ready" && msg.sessionId === this.sessionId) {
-              this.sessionReady = true
-              this.sessionStatus = "Ready"
-            } else if (msg.type === "session_closed" && msg.sessionId === this.sessionId) {
-              this.sessionReady = false
-              this.sessionStatus = "Closed"
-              this.sessionId = null
-            } else if (
-              msg.type === "term_data"
-            ) {
-              let data = atob(msg.data)
-              // Strip ANSI escape codes for cleaner display
-              data = data.replace(
-                /\x1b\[[0-9;]*[a-zA-Z]/g,
-                ""
-              ) // Basic ANSI codes
-              data = data.replace(
-                /\x1b\][0-9];[^\x07]*\x07/g,
-                ""
-              ) // OSC sequences
-              data = data.replace(
-                /\x1b\[?[\d;]*[a-zA-Z]/g,
-                ""
-              ) // Control sequences
-              data = data.replace(
-                /\x1b[\(\)][a-zA-Z0-9]/g,
-                ""
-              ) // Character set
-              data = data.replace(
-                /\x1b[=>]/g,
-                ""
-              ) // Mode switches
-              data = data.replace(
-                /\x1b[\(\)][A-Z~]/g,
-                ""
-              ) // Character set designations
-              data = data.replace(
-                /\x1b\[\?\d+[hl]/g,
-                ""
-              ) // Private mode sequences
-              data = data.replace(
-                /\x1b\[\d*[JK]/g,
-                ""
-              ) // Erase sequences
-              data = data.replace(
-                /\x1b\[\d*;\d*[Hf]/g,
-                ""
-              ) // Cursor position
-              data = data.replace(
-                /\x1b[\[\]PX^_]/g,
-                ""
-              ) // More control chars
-              data = data.replace(
-                /\x1b[\x00-\x1F\x7F-\x9F]/g,
-                ""
-              ) // All control chars
-              data = data.replace(
-                /\r\n/g,
-                "\n"
-              ) // CRLF to LF
-              data = data.replace(
-                /\r/g,
-                ""
-              ) // Remove remaining CR
-              data = data.replace(
-                /\n\s*\n/g,
-                "\n"
-              ) // Clean extra newlines
-              // Fix encoding issues
-              data = data.replace(
-                /Ã©/g,
-                "é"
-              ) // é
-              data = data.replace(
-                /Ã¨/g,
-                "è"
-              ) // è
-              data = data.replace(
-                /Ã/g,
-                "à"
-              ) // à (approximation)
-              data = data.replace(
-                /â/g,
-                "'"
-              ) // apostrophe
-              data = data.replace(
-                /â/g,
-                "-"
-              ) // dash
-              data = data.replace(
-                /â¦/g,
-                "..."
-              ) // ellipsis
-              this.terminalContent +=
-                data
-              // Auto scroll to bottom
-              this.$nextTick(() => {
-                const terminal =
-                  document.getElementById(
-                    "terminal"
-                  )
-                terminal.scrollTop =
-                  terminal.scrollHeight
-              })
-            } else if (
-              msg.type === "error"
-            ) {
-              alert(msg.message)
-            }
-          },
-        },
-        watch: {
-          terminalContent() {
-            this.$nextTick(() => {
-              const terminal =
-                document.getElementById(
-                  "terminal"
-                )
-              terminal.scrollTop =
-                terminal.scrollHeight
-            })
-          },
-        },
-      }).mount("#app")
-    </script>
   </body>
 </html>

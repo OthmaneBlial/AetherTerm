@@ -42,6 +42,8 @@ python client/main.py --host 127.0.0.1 --port 8001 --device-id local-agent --tok
 
 Open `http://127.0.0.1:8001/web/` and sign in. Use `python -m server.admin rotate local-agent --output <new-private-file>` to replace a device credential, or `python -m server.admin revoke local-agent` to disable it. These commands change the server registry; restart the agent with the new file after rotation. Do not put credential files in Git or pass their contents through command arguments. The proposed remote TLS topology and its current evidence are in [the deployment guide](docs/DEPLOYMENT.md).
 
+The terminal UI is bundled locally; no CDN connection is needed. To rebuild it after changing `web/src/`, run `cd web && npm ci && npm run build`. The checked-in `web/assets/` files let the Python quickstart work without Node. xterm.js and its fit addon are MIT licensed; their notices are in `web/licenses/`.
+
 ## Intended product
 
 The proposed first release is a self-hosted console for one operator and multiple explicitly enrolled Linux agents. Browser sign-in, per-browser session ownership and device credentials have local integration tests. Verified HTTPS/WSS for remote access is still required. The intended scope and trust boundaries are in [the product contract](docs/PRODUCT.md) and [the threat model](docs/THREAT_MODEL.md). Those documents describe the complete release contract, not a claim that it has been delivered.
@@ -52,7 +54,7 @@ AetherTerm does not speak SSH. Compatibility, security and ease-of-use compariso
 
 | Area | Current evidence | Release requirement |
 | --- | --- | --- |
-| Shell relay | Two independent local PTYs, explicit close, browser disconnect and agent SIGTERM have integration tests on macOS. | Linux validation, full terminal interactions and further interruption tests. |
+| Shell relay | Two independent local PTYs, explicit close, browser disconnect and agent SIGTERM have integration tests on macOS. Chrome manually showed Unicode, ANSI colors, `less`, Ctrl+C and resize. | Linux validation, remaining terminal interactions and further interruption tests. |
 | Browser access | Password login, cookie session, same-origin WebSocket and negative cross-browser integration test. | Full device authorization, expiry/revocation and deployment validation. |
 | Agent identity | Per-device credential-file enrollment, rotation and revocation tested locally. | Remote encrypted transport, Linux installation and operating guidance. |
 | Transport | Remote cleartext refused in code; direct TLS and a local Caddy HTTPS/WSS proxy test with certificate validation passed. | Public certificate, external network and graphical browser validation. |

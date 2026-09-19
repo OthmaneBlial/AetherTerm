@@ -25,7 +25,7 @@ class PtySession:
     def start(self) -> None:
         pid, fd = pty.fork()
         if pid == 0:
-            environment = {**os.environ, "TERM": "xterm-256color"}
+            environment = {**os.environ, "TERM": "xterm-256color", "BASH_SILENCE_DEPRECATION_WARNING": "1"}
             try:
                 os.execve("/bin/bash", ["/bin/bash"], environment)
             except OSError:

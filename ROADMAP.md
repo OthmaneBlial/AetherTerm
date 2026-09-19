@@ -57,11 +57,11 @@ Une case est cochée seulement après satisfaction de **tous** les critères d'a
 - [ ] 1.3 Transport distant chiffré — HTTPS/WSS direct et proxy Caddy 2.11.4 testés localement avec certificat approuvé/rejeté ; accès distant et navigateur graphique non vérifiés.
 - [ ] 1.4 Protocole et ressources bornés — schémas, trames, quotas de sessions et limiteurs IP distincts testés ; backpressure, charge modérée et fermeture lente encore à valider.
 - [ ] 2.1 PTY isolés et cycle de vie — deux shells et navigateurs, fermeture explicite, fermeture du navigateur et SIGTERM de l'agent testés localement ; Linux, SIGINT et coupure du serveur encore à valider.
-- [ ] 2.2 Terminal interactif et Unicode exact.
+- [ ] 2.2 Terminal interactif et Unicode exact — xterm.js local, UTF-8 fragmenté, couleurs ANSI, `less`, Ctrl+C et redimensionnement testés avec Chrome et un PTY macOS ; Linux, `vim`, flèches et presse-papiers restent à valider.
 - [ ] 2.3 Reconnexion et états d'erreur.
 - [ ] 3.1 Premier démarrage jusqu'au shell.
-- [ ] 3.2 Interface accessible et responsive.
-- [ ] 3.3 Assets Web maîtrisés et identité visuelle.
+- [ ] 3.2 Interface accessible et responsive — vrais boutons, focus et sortie lisible par lecteur d'écran ; débordement horizontal absent à 320, 375, 390, 768 et 1280 px dans Chrome ; interaction tactile réelle et revue clavier complète à faire.
+- [ ] 3.3 Assets Web maîtrisés et identité visuelle — xterm.js 6.0.0 et FitAddon 0.11.0 figés, build local et licences incluses ; favicon, CSP, paquet installable et essai hors ligne encore requis.
 - [ ] 4.1 Architecture et configuration testables.
 - [ ] 4.2 Suite de tests utile.
 - [ ] 4.3 Dépendances et maintenance vérifiables.

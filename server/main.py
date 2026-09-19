@@ -215,7 +215,7 @@ async def web_websocket(websocket: WebSocket):
                     continue
                 session_id = str(uuid.uuid4())
                 sessions[session_id] = {'device_id': device_id, 'web_ws': websocket, 'ready': False}
-                await websocket.send_text(json.dumps({"type": "session_started", "sessionId": session_id}))
+                await websocket.send_text(json.dumps({"type": "session_started", "sessionId": session_id, "deviceId": device_id}))
                 await devices[device_id].send_text(json.dumps({"type": "login_request", "sessionId": session_id}))
                 log_security_event("SESSION_STARTED", client_ip, f"Session: {session_id}, Device: {device_id}")
             elif msg['type'] == 'term_input':
