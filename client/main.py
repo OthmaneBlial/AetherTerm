@@ -53,6 +53,7 @@ async def connect(host, port, device_id, token, description, *, tls=False, ca_fi
                 response = await websocket.recv()
                 msg = json.loads(response)
                 if msg['type'] == 'registered':
+                    backoff = 1
                     print("Agent registered with the AetherTerm prototype.")
                     print("WSS certificate verified." if tls else "Local WS connection established; use loopback only.")
                 else:
@@ -117,15 +118,21 @@ async def connect(host, port, device_id, token, description, *, tls=False, ca_fi
                             pass  # handle heartbeat
                 except websockets.exceptions.ConnectionClosed as exc:
                     print(f"Agent connection closed: {exc.code}")
+                    if exc.code == 1008 and exc.reason == "Device revoked or credential rotated":
+                        print("Device credential was revoked or rotated; stopping agent.")
+                        return
                 finally:
                     heartbeat_task.cancel()
                     await asyncio.gather(heartbeat_task, return_exceptions=True)
                     await asyncio.gather(*(session.close() for session in sessions.values()), return_exceptions=True)
                     sessions.clear()
-        except Exception as e:
-            print(f"Connection failed: {e}, retrying in {backoff}s")
-            await asyncio.sleep(backoff)
-            backoff = min(backoff * 2, 60)
+        except ssl.SSLCertVerificationError:
+            print("WSS certificate validation failed; stopping agent.")
+            return
+        except (OSError, websockets.exceptions.WebSocketException) as exc:
+            print(f"Connection unavailable ({type(exc).__name__}); retrying in {backoff}s")
+        await asyncio.sleep(backoff)
+        backoff = min(backoff * 2, 60)
 
 def main():
     parser = argparse.ArgumentParser(description="AetherTerm Client")
@@ -136,7 +143,6 @@ def main():
     parser.add_argument('--description', default='', help='Device description')
     parser.add_argument('--tls', action='store_true', help='Use WSS with certificate validation')
     parser.add_argument('--ca-file', type=Path, help='Optional trusted CA bundle for WSS')
-    parser.add_argument('--reconnect', action='store_true', help='Enable auto-reconnect')
     args = parser.parse_args()
 
     try:

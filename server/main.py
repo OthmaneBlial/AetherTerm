@@ -10,7 +10,8 @@ from .agents import AgentRegistry, agents_file
 from .auth import COOKIE_NAME, SESSION_SECONDS, OperatorAuth, operator_file
 from .network import transport_allowed
 from .limits import (ConnectionLimiter, SlidingWindowLimiter, MAX_CONNECTED_AGENTS,
-                     MAX_SESSIONS_PER_AGENT, MAX_SESSIONS_PER_BROWSER, MAX_SESSIONS_TOTAL)
+                     MAX_SESSIONS_PER_AGENT, MAX_SESSIONS_PER_BROWSER, MAX_SESSIONS_TOTAL,
+                     SESSION_START_TIMEOUT)
 from .protocol import ProtocolError, parse_message
 
 app = FastAPI()
@@ -73,6 +74,24 @@ def session_capacity(websocket: WebSocket, device_id: str) -> bool:
     if sum(session["web_ws"] is websocket for session in sessions.values()) >= MAX_SESSIONS_PER_BROWSER:
         return False
     return sum(session["device_id"] == device_id for session in sessions.values()) < MAX_SESSIONS_PER_AGENT
+
+
+async def expire_pending_session(session_id: str) -> None:
+    await asyncio.sleep(SESSION_START_TIMEOUT)
+    session = sessions.get(session_id)
+    if session is None or session['ready']:
+        return
+    await send_to_browser(session_id, {"type": "session_closed", "sessionId": session_id,
+                                       "reason": "Shell did not become ready"})
+    session = sessions.pop(session_id, None)
+    if session:
+        device_socket = devices.get(session['device_id'])
+        if device_socket:
+            try:
+                await asyncio.wait_for(device_socket.send_text(json.dumps(
+                    {"type": "close_session", "sessionId": session_id})), timeout=3)
+            except Exception:
+                pass
 
 
 def active_device(device_id: str) -> bool:
@@ -216,7 +235,15 @@ async def web_websocket(websocket: WebSocket):
                 session_id = str(uuid.uuid4())
                 sessions[session_id] = {'device_id': device_id, 'web_ws': websocket, 'ready': False}
                 await websocket.send_text(json.dumps({"type": "session_started", "sessionId": session_id, "deviceId": device_id}))
-                await devices[device_id].send_text(json.dumps({"type": "login_request", "sessionId": session_id}))
+                try:
+                    await asyncio.wait_for(devices[device_id].send_text(json.dumps(
+                        {"type": "login_request", "sessionId": session_id})), timeout=3)
+                except Exception:
+                    await send_to_browser(session_id, {"type": "session_closed", "sessionId": session_id,
+                                                       "reason": "Agent unavailable"})
+                    sessions.pop(session_id, None)
+                    continue
+                asyncio.create_task(expire_pending_session(session_id))
                 log_security_event("SESSION_STARTED", client_ip, f"Session: {session_id}, Device: {device_id}")
             elif msg['type'] == 'term_input':
                 session_id = msg['sessionId']

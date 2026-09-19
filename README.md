@@ -44,6 +44,8 @@ Open `http://127.0.0.1:8001/web/` and sign in. Use `python -m server.admin rotat
 
 The terminal UI is bundled locally; no CDN connection is needed. To rebuild it after changing `web/src/`, run `cd web && npm ci && npm run build`. The checked-in `web/assets/` files let the Python quickstart work without Node. xterm.js and its fit addon are MIT licensed; their notices are in `web/licenses/`.
 
+The agent reconnects automatically after a temporary server outage with bounded backoff. Existing shells close when either side disconnects; open a new session after reconnection. An invalid agent credential or rejected WSS certificate stops the agent so the operator can correct the configuration.
+
 ## Intended product
 
 The proposed first release is a self-hosted console for one operator and multiple explicitly enrolled Linux agents. Browser sign-in, per-browser session ownership and device credentials have local integration tests. Verified HTTPS/WSS for remote access is still required. The intended scope and trust boundaries are in [the product contract](docs/PRODUCT.md) and [the threat model](docs/THREAT_MODEL.md). Those documents describe the complete release contract, not a claim that it has been delivered.

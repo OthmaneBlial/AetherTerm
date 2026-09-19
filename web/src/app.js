@@ -185,7 +185,8 @@ function handleMessage(event) {
     if (session) session.terminal.write(decodedBytes(message.data))
   } else if (message.type === 'session_closed') {
     const session = sessions.get(message.sessionId)
-    if (session) setNotice(`Shell closed on ${session.deviceId}.`, 'neutral')
+    if (message.reason) setNotice(message.reason, 'error')
+    else if (session) setNotice(`Shell closed on ${session.deviceId}.`, 'neutral')
     removeSession(message.sessionId)
   } else if (message.type === 'error') {
     pendingDevice = null
