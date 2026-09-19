@@ -1,0 +1,13 @@
+.git
+.github
+.venv
+**/__pycache__
+**/*.pyc
+**/*.token
+**/*.egg-info
+build
+dist
+artifacts
+web/node_modules
+operator.json
+agents.json
