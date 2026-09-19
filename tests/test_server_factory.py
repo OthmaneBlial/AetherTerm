@@ -21,6 +21,20 @@ from server.protocol import WEBSOCKET_SUBPROTOCOL
 
 
 class ServerFactoryTests(unittest.TestCase):
+    def test_invalid_identity_and_asset_paths_fail_at_startup(self):
+        with tempfile.TemporaryDirectory(prefix="aetherterm-invalid-config-") as directory:
+            root = Path(directory)
+            with self.assertRaisesRegex(ValueError, "different private files"):
+                create_app(operator_path=root / "identity.json", agents_path=root / "identity.json")
+            with self.assertRaisesRegex(RuntimeError, "Web assets not found"):
+                create_app(operator_path=root / "operator.json", agents_path=root / "agents.json",
+                           assets_path=root / "missing")
+            incomplete = root / "web"
+            incomplete.mkdir()
+            with self.assertRaisesRegex(RuntimeError, "Web asset not found"):
+                create_app(operator_path=root / "operator.json", agents_path=root / "agents.json",
+                           assets_path=incomplete)
+
     def test_operator_file_must_remain_private_and_regular(self):
         with tempfile.TemporaryDirectory(prefix="aetherterm-operator-file-") as directory:
             path = Path(directory) / "operator.json"

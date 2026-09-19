@@ -27,7 +27,7 @@ navigateur -- HTTP(S) /login --> serveur FastAPI
 | Cookies, sockets, liste des sessions et dernière activité | `ServerState` d'une instance FastAPI | Volatile ; perdu au redémarrage |
 | Processus shell et tampon de terminal | Processus/PTY de l'agent et navigateur | Volatile ; fermé à la fin de la session |
 
-`server.main.create_app()` crée un état indépendant par instance. Le lancement documenté utilise un seul worker : plusieurs workers ne partagent ni les agents ni les sessions. Le CLI `aetherterm-server` écoute uniquement `127.0.0.1` et fixe la confiance des en-têtes de proxy à cette adresse. La terminaison TLS doit être effectuée par un proxy de confiance sur la même machine ; voir [DEPLOYMENT.md](DEPLOYMENT.md). HTTP/WS en clair est accepté uniquement pour un pair sur boucle locale. Un accès distant réel avec certificat public n'a pas encore été validé.
+`server.main.create_app()` crée un état indépendant par instance à partir de `ServerConfig`. Cette configuration refuse au démarrage un chemin partagé par les identités opérateur et agent ou un paquet d'assets Web incomplet. Le lancement documenté utilise un seul worker : plusieurs workers ne partagent ni les agents ni les sessions. Le CLI `aetherterm-server` écoute uniquement `127.0.0.1` et fixe la confiance des en-têtes de proxy à cette adresse. La terminaison TLS doit être effectuée par un proxy de confiance sur la même machine ; voir [DEPLOYMENT.md](DEPLOYMENT.md). HTTP/WS en clair est accepté uniquement pour un pair sur boucle locale. Un accès distant réel avec certificat public n'a pas encore été validé.
 
 ## Limites et défaillances prévues
 

@@ -12,8 +12,9 @@ import time
 import uuid
 from urllib.parse import parse_qs
 
-from .agents import AgentRegistry, agents_file
-from .auth import COOKIE_NAME, SESSION_SECONDS, OperatorAuth, operator_file
+from .agents import AgentRegistry
+from .auth import COOKIE_NAME, SESSION_SECONDS, OperatorAuth
+from .config import ServerConfig
 from .network import transport_allowed
 from .limits import (SlidingWindowLimiter, MAX_CONNECTED_AGENTS,
                      MAX_OPEN_AGENT_SOCKETS, MAX_OPEN_BROWSER_SOCKETS,
@@ -515,14 +516,14 @@ async def root(request: Request):
 
 def create_app(*, operator_path: Path | None = None, agents_path: Path | None = None,
                assets_path: Path | None = None) -> FastAPI:
+    config = ServerConfig.from_paths(operator_path=operator_path, agents_path=agents_path,
+                                     assets_path=assets_path or web_dir)
     application = FastAPI()
     state = ServerState(
-        operator_auth=OperatorAuth(operator_path or operator_file()),
-        agent_registry=AgentRegistry(agents_path or agents_file()),
-        web_dir=assets_path or web_dir,
+        operator_auth=OperatorAuth(config.operator_path),
+        agent_registry=AgentRegistry(config.agents_path),
+        web_dir=config.assets_path,
     )
-    if not state.web_dir.is_dir():
-        raise RuntimeError(f"AetherTerm Web assets not found: {state.web_dir}")
     application.state.runtime = state
     application.middleware("http")(protect_web)
     application.mount("/web", StaticFiles(directory=state.web_dir, html=True), name="web")
