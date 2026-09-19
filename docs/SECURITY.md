@@ -27,4 +27,4 @@ If an agent token may have leaked:
 
 If the operator password or session may have leaked, stop the server to invalidate in-memory sessions, replace the operator credential file through a private setup procedure, and restart. The current CLI intentionally refuses to overwrite an existing operator file; preserve a backup securely while replacing it. Inspect any reachable agent accounts for effects. No password reset UI exists.
 
-Do not paste token files, cookies, raw terminal output or private hostnames into a public issue. See the repository [security reporting policy](../SECURITY.md) for the current disclosure channel status.
+Do not paste token files, cookies, raw terminal output or private hostnames into a public issue. See the repository [security reporting policy](../SECURITY.md) for the verified private reporting route.
