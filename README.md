@@ -6,7 +6,13 @@ An early prototype that relays a shell on an agent machine to a browser through 
 
 <img src="assets/screenshots/mobile.png" alt="AetherTerm console at 375 px with a live Linux shell" width="300">
 
-These are real browser captures from the [Ubuntu CI run for `dbaf5e9`](https://github.com/OthmaneBlial/AetherTerm/actions/runs/35446357041), with a disposable agent and PTY. The [capture record](docs/SCREENSHOTS.md) identifies their source and limits.
+<details><summary>See Vim editing a file in the real Linux shell</summary>
+
+![Vim running inside the AetherTerm browser terminal on Ubuntu CI](assets/screenshots/vim.png)
+
+</details>
+
+These are real browser captures with disposable agents and PTYs. The desktop and mobile images come from [Ubuntu CI run 35446357041](https://github.com/OthmaneBlial/AetherTerm/actions/runs/35446357041); Vim comes from [run 35447709065](https://github.com/OthmaneBlial/AetherTerm/actions/runs/35447709065). The [capture record](docs/SCREENSHOTS.md) identifies their source and limits.
 
 > **Security warning:** operator sign-in and per-device agent credentials are implemented. The documented local run uses plain `ws://`; a TLS option has only been checked locally with a temporary certificate. Keep the server bound to loopback while the [security roadmap](ROADMAP.md) is implemented. Do not use this revision for production administration or expose it to a LAN or the Internet.
 
@@ -18,7 +24,7 @@ These are real browser captures from the [Ubuntu CI run for `dbaf5e9`](https://g
 - Device-bound agent credentials stored in owner-readable files, with server-side rotation and revocation.
 - Agent reconnection attempts after connection failures, plus isolated PTYs for simultaneous local sessions. Existing shells close after disconnection; a returning agent needs a new session.
 
-The browser terminal uses locally bundled xterm.js. Unicode paste, ANSI colors, `less`, the Ctrl+C toolbar action and resize have been exercised on macOS in Chrome. The Linux Chromium CI journey also checks shell output, Unicode rendering, the Ctrl+C action and Bash history with ArrowUp; `vim` and real touch input still need validation. The page derives its WebSocket URL from the page origin, but remote HTTPS/WSS deployment has not been validated outside a local proxy test. Operator and agent credentials are created outside the repository; no working defaults are shipped.
+The browser terminal uses locally bundled xterm.js. Unicode paste, ANSI colors, `less`, the Ctrl+C toolbar action and resize have been exercised on macOS in Chrome. The Linux Chromium CI journey also checks shell output, Unicode rendering, the Ctrl+C action, Bash history with ArrowUp and editing a file in `vim`; real touch input still needs validation. The page derives its WebSocket URL from the page origin, but remote HTTPS/WSS deployment has not been validated outside a local proxy test. Operator and agent credentials are created outside the repository; no working defaults are shipped.
 
 ## Loopback-only development run
 
