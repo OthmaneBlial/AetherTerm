@@ -24,6 +24,9 @@ dependencies = [
   "websockets==17.1",
 ]
 
+[project.optional-dependencies]
+dev = ["build==1.6.1", "ruff==0.16.7"]
+
 [project.scripts]
 aetherterm-admin = "server.admin:main"
 aetherterm-agent = "client.main:main"
@@ -36,3 +39,9 @@ include-package-data = false
 
 [tool.setuptools.package-data]
 aetherterm_assets = ["*.html", "*.svg", "*.ico", "assets/*", "licenses/*"]
+
+[tool.ruff]
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F"]

@@ -9,7 +9,8 @@ Use Python 3.13 in a virtual environment and Node.js 22 for the Web bundle. The 
 ```bash
 python3.13 -m venv .venv
 source .venv/bin/activate
-python -m pip install . build
+python -m pip install '.[dev]'
+ruff check server client tests scripts
 python -m unittest discover -s tests -q
 cd web
 npm ci
