@@ -1,0 +1,45 @@
+"""Credential-file permissions and device binding."""
+
+from pathlib import Path
+import os
+import stat
+import tempfile
+import unittest
+
+from client.main import read_token_file
+from server.agents import AgentRegistry, issue_credential, revoke_device
+
+
+class AgentCredentialTests(unittest.TestCase):
+    def test_private_credential_rotation_and_rejection(self):
+        with tempfile.TemporaryDirectory(prefix="aetherterm-agent-test-") as directory:
+            base = Path(directory)
+            registry_path = base / "agents.json"
+            original_file = base / "original.token"
+            issue_credential(registry_path, "linux-one", original_file)
+            self.assertEqual(stat.S_IMODE(original_file.stat().st_mode), 0o600)
+            token = read_token_file(original_file)
+            registry = AgentRegistry(registry_path)
+            self.assertIsNotNone(registry.authenticate("linux-one", token))
+            self.assertIsNone(registry.authenticate("linux-two", token))
+
+            os.chmod(original_file, 0o644)
+            with self.assertRaises(ValueError):
+                read_token_file(original_file)
+            os.chmod(original_file, 0o600)
+            symlink = base / "link.token"
+            symlink.symlink_to(original_file)
+            with self.assertRaises(ValueError):
+                read_token_file(symlink)
+
+            rotated_file = base / "rotated.token"
+            issue_credential(registry_path, "linux-one", rotated_file, rotate=True)
+            self.assertIsNone(registry.authenticate("linux-one", token))
+            rotated = read_token_file(rotated_file)
+            self.assertIsNotNone(registry.authenticate("linux-one", rotated))
+            revoke_device(registry_path, "linux-one")
+            self.assertIsNone(registry.authenticate("linux-one", rotated))
+
+
+if __name__ == "__main__":
+    unittest.main()

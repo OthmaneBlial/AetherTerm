@@ -6,22 +6,16 @@ import json
 import uuid
 from urllib.parse import parse_qs
 
+from .agents import AgentRegistry, agents_file
 from .auth import COOKIE_NAME, SESSION_SECONDS, OperatorAuth, operator_file
 
 app = FastAPI()
 operator_auth = OperatorAuth(operator_file())
+agent_registry = AgentRegistry(agents_file())
 
 import os
 import time
-import hashlib
 from collections import defaultdict
-
-# Security configuration
-ALLOWED_TOKENS = {
-    "secret123": "default_client",
-    "admin_token": "admin_client",
-    "demo_token": "demo_client"
-}
 
 # Rate limiting
 connection_attempts = defaultdict(list)
@@ -46,10 +40,6 @@ def is_rate_limited(client_ip: str) -> bool:
     connection_attempts[client_ip].append(now)
     return False
 
-def validate_token(token: str) -> bool:
-    """Validate client token"""
-    return token in ALLOWED_TOKENS
-
 def log_security_event(event: str, client_ip: str = "unknown", details: str = ""):
     """Log security events"""
     timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
@@ -64,11 +54,17 @@ if os.path.exists(web_dir):
 else:
     print("Web directory not found!")
 
-print("AetherTerm prototype: operator login protects browser access; agent credentials still need replacement.")
+print("AetherTerm prototype: operator and device credentials are required; remote transport is not ready.")
 
 devices = {}  # device_id: websocket
+device_credentials = {}  # device_id: credential hash for revocation checks
 sessions = {}  # session_id: {'device_id': str, 'web_ws': WebSocket}
 active_connections = {}  # client_ip: connection_info
+
+
+def active_device(device_id: str) -> bool:
+    token_hash = device_credentials.get(device_id)
+    return bool(device_id in devices and token_hash and agent_registry.is_active(device_id, token_hash))
 
 
 def same_origin(request: Request) -> bool:
@@ -181,11 +177,11 @@ async def web_websocket(websocket: WebSocket):
             log_security_event("WEB_MESSAGE", client_ip, f"Type: {msg.get('type', 'unknown')}")
 
             if msg['type'] == 'list_devices':
-                device_list = list(devices.keys())
+                device_list = [device_id for device_id in devices if active_device(device_id)]
                 await websocket.send_text(json.dumps({"type": "device_list", "devices": device_list}))
             elif msg['type'] == 'start_session':
                 device_id = msg['deviceId']
-                if device_id not in devices:
+                if not active_device(device_id):
                     await websocket.send_text(json.dumps({"type": "error", "message": "Device not connected"}))
                     continue
                 session_id = str(uuid.uuid4())
@@ -196,7 +192,7 @@ async def web_websocket(websocket: WebSocket):
             elif msg['type'] == 'term_input':
                 session_id = msg['sessionId']
                 input_b64 = msg['input']
-                if session_id not in sessions or sessions[session_id]['web_ws'] is not websocket:
+                if session_id not in sessions or sessions[session_id]['web_ws'] is not websocket or not active_device(sessions[session_id]['device_id']):
                     log_security_event("INVALID_SESSION", client_ip)
                     await websocket.send_text(json.dumps({"type": "error", "message": "Session unavailable"}))
                     continue
@@ -206,7 +202,7 @@ async def web_websocket(websocket: WebSocket):
                 session_id = msg['sessionId']
                 cols = msg.get('cols', 80)
                 rows = msg.get('rows', 24)
-                if session_id in sessions and sessions[session_id]['web_ws'] is websocket:
+                if session_id in sessions and sessions[session_id]['web_ws'] is websocket and active_device(sessions[session_id]['device_id']):
                     device_id = sessions[session_id]['device_id']
                     await devices[device_id].send_text(json.dumps({"type": "resize", "sessionId": session_id, "cols": cols, "rows": rows}))
                 else:
@@ -224,7 +220,7 @@ async def web_websocket(websocket: WebSocket):
 
 @app.websocket("/client")
 async def client_websocket(websocket: WebSocket):
-    client_ip = websocket.client.host if hasattr(websocket, 'client') else "unknown"
+    client_ip = websocket.client.host if websocket.client else "unknown"
 
     # Security check: Rate limiting for client connections too
     if is_rate_limited(client_ip):
@@ -235,38 +231,58 @@ async def client_websocket(websocket: WebSocket):
     await websocket.accept()
     log_security_event("CLIENT_CONNECTION_ESTABLISHED", client_ip, "Client connected")
     device_id = None
+    token_hash = None
 
     try:
         while True:
-            data = await websocket.receive_text()
+            if device_id and not agent_registry.is_active(device_id, token_hash):
+                await websocket.close(code=1008, reason="Device revoked or credential rotated")
+                break
+            try:
+                data = await asyncio.wait_for(websocket.receive_text(), timeout=1 if device_id else 5)
+            except asyncio.TimeoutError:
+                if device_id:
+                    continue
+                await websocket.close(code=1008, reason="Registration required")
+                break
+            if device_id and not agent_registry.is_active(device_id, token_hash):
+                await websocket.close(code=1008, reason="Device revoked or credential rotated")
+                break
             msg = json.loads(data)
 
             if msg['type'] == 'register':
-                token = msg.get('token', '')
-                device_id = msg.get('deviceId', '')
-
-                # Security check: Validate token
-                if not validate_token(token):
-                    log_security_event("INVALID_TOKEN", client_ip, f"Device: {device_id}")
-                    await websocket.send_text(json.dumps({"type": "error", "message": "Invalid authentication token"}))
+                if device_id is not None:
+                    await websocket.close(code=1008, reason="Already registered")
+                    return
+                requested_id = msg.get('deviceId', '')
+                candidate_hash = agent_registry.authenticate(requested_id, msg.get('token', ''))
+                if candidate_hash is None:
+                    log_security_event("INVALID_AGENT_CREDENTIAL", client_ip)
+                    await websocket.send_text(json.dumps({"type": "error", "message": "Invalid device credential"}))
                     await websocket.close(code=1008, reason="Authentication failed")
                     return
 
-                # Check if device ID is already in use
-                if device_id in devices:
-                    log_security_event("DUPLICATE_DEVICE", client_ip, f"Device: {device_id}")
+                if requested_id in devices:
+                    log_security_event("DUPLICATE_DEVICE", client_ip, f"Device: {requested_id}")
                     await websocket.send_text(json.dumps({"type": "error", "message": "Device ID already in use"}))
                     await websocket.close(code=1008, reason="Device ID conflict")
                     return
 
+                device_id = requested_id
+                token_hash = candidate_hash
                 devices[device_id] = websocket
+                device_credentials[device_id] = token_hash
                 log_security_event("CLIENT_REGISTERED", client_ip, f"Device: {device_id}")
                 await websocket.send_text(json.dumps({"type": "registered"}))
+
+            elif device_id is None:
+                await websocket.close(code=1008, reason="Registration required")
+                return
 
             elif msg['type'] == 'term_data':
                 session_id = msg['sessionId']
                 data_b64 = msg['data']
-                if session_id in sessions:
+                if session_id in sessions and sessions[session_id]['device_id'] == device_id:
                     web_ws = sessions[session_id]['web_ws']
                     await web_ws.send_text(json.dumps({"type": "term_data", "sessionId": session_id, "data": data_b64}))
                     log_security_event("TERM_DATA_FORWARDED", client_ip, f"Session: {session_id}")
@@ -276,16 +292,20 @@ async def client_websocket(websocket: WebSocket):
             elif msg['type'] == 'heartbeat':
                 await websocket.send_text(json.dumps({"type": "heartbeat_ack"}))
 
-            elif msg['type'] == 'login_request':
-                session_id = msg['sessionId']
-                log_security_event("LOGIN_REQUEST", client_ip, f"Session: {session_id}")
-
     except Exception as e:
         log_security_event("CLIENT_ERROR", client_ip, str(e))
         print(f"Client WS error: {e}")
     finally:
-        if device_id and device_id in devices:
+        if device_id and devices.get(device_id) is websocket:
             del devices[device_id]
+            device_credentials.pop(device_id, None)
+            for session_id, session in list(sessions.items()):
+                if session['device_id'] == device_id:
+                    del sessions[session_id]
+                    try:
+                        await session['web_ws'].send_text(json.dumps({"type": "session_closed", "sessionId": session_id}))
+                    except Exception:
+                        pass
         log_security_event("CLIENT_CONNECTION_CLOSED", client_ip, f"Device: {device_id}")
 
 @app.get("/")

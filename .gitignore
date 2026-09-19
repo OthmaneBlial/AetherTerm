@@ -1,2 +1,13 @@
-server/__pycache__
-client/__pycache__
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.coverage
+build/
+dist/
+*.egg-info/
+*.token
+operator.json
+agents.json
+*.lock
+.DS_Store

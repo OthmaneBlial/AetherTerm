@@ -10,6 +10,21 @@ import termios
 import struct
 import fcntl
 import time
+from pathlib import Path
+import stat
+
+
+def read_token_file(path: Path) -> str:
+    path = path.expanduser()
+    if path.is_symlink():
+        raise ValueError("Token file must not be a symbolic link")
+    info = path.stat()
+    if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or info.st_mode & 0o077:
+        raise ValueError("Token file must be a private regular file owned by this user (mode 0600)")
+    token = path.read_text(encoding="utf-8").strip()
+    if not token or len(token) > 256 or any(character.isspace() for character in token):
+        raise ValueError("Token file contains an invalid credential")
+    return token
 
 async def connect(host, port, device_id, token, description):
     uri = f"ws://{host}:{port}/client"
@@ -23,7 +38,7 @@ async def connect(host, port, device_id, token, description):
                 msg = json.loads(response)
                 if msg['type'] == 'registered':
                     print("Agent registered with the AetherTerm prototype.")
-                    print("Browser access is unauthenticated; use loopback only.")
+                    print("Remote transport is not configured; use loopback only.")
                 else:
                     print("❌ Registration failed - Invalid token or server error")
                     return
@@ -102,12 +117,16 @@ def main():
     parser.add_argument('--host', required=True, help='Server host')
     parser.add_argument('--port', type=int, required=True, help='Server port')
     parser.add_argument('--device-id', required=True, help='Unique device ID')
-    parser.add_argument('--token', required=True, help='Authentication token')
+    parser.add_argument('--token-file', required=True, type=Path, help='Private 0600 agent credential file')
     parser.add_argument('--description', default='', help='Device description')
     parser.add_argument('--reconnect', action='store_true', help='Enable auto-reconnect')
     args = parser.parse_args()
 
-    asyncio.run(connect(args.host, args.port, args.device_id, args.token, args.description))
+    try:
+        token = read_token_file(args.token_file)
+    except (OSError, UnicodeError, ValueError) as exc:
+        parser.error(str(exc))
+    asyncio.run(connect(args.host, args.port, args.device_id, token, args.description))
 
 if __name__ == '__main__':
     main()

@@ -50,10 +50,10 @@ L'intérêt potentiel est la simplicité d'un agent Linux relié à une console 
 Une case est cochée seulement après satisfaction de **tous** les critères d'acceptation et validations de la tâche. Les étapes partielles restent ouvertes, même si leurs fichiers ont été modifiés. Les preuves sont consignées dans les commits, les tests et, pour les services externes, les vérifications de la ressource publiée.
 
 - [ ] 0.1 Contrat v1 et modèle de menace — documents rédigés ; revue par une autre personne encore requise.
-- [ ] 0.2 Communication honnête — README et bannières corrigés ; jetons publics encore présents dans le code jusqu'à 1.2.
+- [x] 0.2 Communication honnête — README, bannières et exemples locaux alignés sur le code ; jetons publics supprimés ; revue des chaînes et démarrage local validés.
 - [ ] 0.3 Valeur et comparaison avec retours réels — sources officielles et protocole de mesure documentés ; essais comparables et 3 à 5 retours consentis absents.
 - [ ] 1.1 Authentification navigateur et droits de session — connexion et isolation entre navigateurs testées localement ; autorisation par appareil et validation de révocation/expiration restent à terminer.
-- [ ] 1.2 Enrôlement et révocation d'agents.
+- [x] 1.2 Enrôlement et révocation d'agents — identité liée à l'appareil, fichier 0600, rotation et révocation vérifiées par tests et aller-retour réel sur boucle locale.
 - [ ] 1.3 Transport distant chiffré.
 - [ ] 1.4 Protocole et ressources bornés.
 - [ ] 2.1 PTY isolés et cycle de vie.

@@ -18,6 +18,7 @@ import urllib.request
 import websockets
 from websockets.exceptions import ConnectionClosed, InvalidStatus
 
+from server.agents import issue_credential, revoke_device
 from server.auth import COOKIE_NAME, initialize_operator
 
 
@@ -29,10 +30,17 @@ class BrowserAuthTests(unittest.IsolatedAsyncioTestCase):
         self.temp = tempfile.TemporaryDirectory(prefix="aetherterm-auth-test-")
         self.operator_file = Path(self.temp.name) / "operator.json"
         initialize_operator(self.operator_file, "a-test-password-only")
+        self.agents_file = Path(self.temp.name) / "agents.json"
+        token_file = Path(self.temp.name) / "agent.token"
+        issue_credential(self.agents_file, "test-agent", token_file)
+        self.agent_token = token_file.read_text(encoding="utf-8").strip()
         with socket.socket() as listener:
             listener.bind(("127.0.0.1", 0))
             self.port = listener.getsockname()[1]
-        env = {**os.environ, "AETHERTERM_OPERATOR_FILE": str(self.operator_file), "PYTHONDONTWRITEBYTECODE": "1"}
+        env = {
+            **os.environ, "AETHERTERM_OPERATOR_FILE": str(self.operator_file),
+            "AETHERTERM_AGENTS_FILE": str(self.agents_file), "PYTHONDONTWRITEBYTECODE": "1", "PYTHONUNBUFFERED": "1",
+        }
         self.server_log = open(Path(self.temp.name) / "server.log", "w+", encoding="utf-8")
         self.server = subprocess.Popen(
             [sys.executable, "-m", "uvicorn", "server.main:app", "--host", "127.0.0.1", "--port", str(self.port)],
@@ -98,7 +106,7 @@ class BrowserAuthTests(unittest.IsolatedAsyncioTestCase):
                 pass
 
         async with websockets.connect(f"ws://127.0.0.1:{self.port}/client") as agent:
-            await agent.send(json.dumps({"type": "register", "deviceId": "test-agent", "token": "secret123"}))
+            await agent.send(json.dumps({"type": "register", "deviceId": "test-agent", "token": self.agent_token}))
             self.assertEqual(json.loads(await agent.recv())["type"], "registered")
             async with websockets.connect(uri, origin=origin, additional_headers={"Cookie": cookie}) as owner:
                 await owner.send(json.dumps({"type": "list_devices"}))
@@ -142,6 +150,70 @@ class BrowserAuthTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.request("GET", "/web/", headers={"Cookie": cookie})[0], 303)
         self.assertEqual(self.request("POST", "/login", "password=a-test-password-only", {"Origin": origin})[0], 401)
         self.assertEqual(self.request("POST", "/login", "password=new-test-password-only", {"Origin": origin})[0], 303)
+
+    async def test_device_identity_rotation_and_revocation(self):
+        agent_uri = f"ws://127.0.0.1:{self.port}/client"
+        origin = f"http://127.0.0.1:{self.port}"
+        status, headers = self.request("POST", "/login", "password=a-test-password-only", {"Origin": origin})
+        self.assertEqual(status, 303)
+        cookie = headers["set-cookie"].split(";", 1)[0]
+
+        async with websockets.connect(agent_uri) as wrong:
+            await wrong.send(json.dumps({"type": "register", "deviceId": "other-agent", "token": self.agent_token}))
+            self.assertEqual(json.loads(await wrong.recv())["message"], "Invalid device credential")
+            with self.assertRaises(ConnectionClosed):
+                await wrong.recv()
+
+        async with websockets.connect(agent_uri) as agent_a:
+            await agent_a.send(json.dumps({"type": "register", "deviceId": "test-agent", "token": self.agent_token}))
+            self.assertEqual(json.loads(await agent_a.recv())["type"], "registered")
+            async with websockets.connect(agent_uri) as duplicate:
+                await duplicate.send(json.dumps({"type": "register", "deviceId": "test-agent", "token": self.agent_token}))
+                self.assertEqual(json.loads(await duplicate.recv())["message"], "Device ID already in use")
+
+            second_file = Path(self.temp.name) / "second.token"
+            issue_credential(self.agents_file, "second-agent", second_file)
+            second_token = second_file.read_text(encoding="utf-8").strip()
+            async with websockets.connect(agent_uri) as agent_b:
+                await agent_b.send(json.dumps({"type": "register", "deviceId": "second-agent", "token": second_token}))
+                self.assertEqual(json.loads(await agent_b.recv())["type"], "registered")
+                async with websockets.connect(f"ws://127.0.0.1:{self.port}/ws", origin=origin, additional_headers={"Cookie": cookie}) as browser:
+                    await browser.send(json.dumps({"type": "list_devices"}))
+                    self.assertEqual(set(json.loads(await browser.recv())["devices"]), {"test-agent", "second-agent"})
+                    await browser.send(json.dumps({"type": "start_session", "deviceId": "second-agent"}))
+                    session = json.loads(await browser.recv())["sessionId"]
+                    self.assertEqual(json.loads(await agent_b.recv())["sessionId"], session)
+                    await agent_a.send(json.dumps({"type": "term_data", "sessionId": session, "data": base64.b64encode(b"forged").decode()}))
+                    await agent_b.send(json.dumps({"type": "term_data", "sessionId": session, "data": base64.b64encode(b"legitimate").decode()}))
+                    output = json.loads(await asyncio.wait_for(browser.recv(), 2))
+                    self.assertEqual(base64.b64decode(output["data"]), b"legitimate")
+
+                rotated_file = Path(self.temp.name) / "rotated.token"
+                issue_credential(self.agents_file, "test-agent", rotated_file, rotate=True)
+                with self.assertRaises(ConnectionClosed):
+                    await asyncio.wait_for(agent_a.recv(), 3)
+
+        async with websockets.connect(agent_uri) as old_credential:
+            await old_credential.send(json.dumps({"type": "register", "deviceId": "test-agent", "token": self.agent_token}))
+            self.assertEqual(json.loads(await old_credential.recv())["message"], "Invalid device credential")
+
+        new_token = rotated_file.read_text(encoding="utf-8").strip()
+        async with websockets.connect(agent_uri) as rotated:
+            await rotated.send(json.dumps({"type": "register", "deviceId": "test-agent", "token": new_token}))
+            self.assertEqual(json.loads(await rotated.recv())["type"], "registered")
+            revoke_device(self.agents_file, "test-agent")
+            with self.assertRaises(ConnectionClosed):
+                await asyncio.wait_for(rotated.recv(), 3)
+
+        async with websockets.connect(agent_uri) as revoked:
+            await revoked.send(json.dumps({"type": "register", "deviceId": "test-agent", "token": new_token}))
+            self.assertEqual(json.loads(await revoked.recv())["message"], "Invalid device credential")
+        self.server_log.flush()
+        self.server_log.seek(0)
+        logs = self.server_log.read()
+        self.assertNotIn(self.agent_token, logs)
+        self.assertNotIn(new_token, logs)
+        self.assertNotIn(second_token, logs)
 
 
 if __name__ == "__main__":
