@@ -4,6 +4,7 @@ from pathlib import Path
 from contextlib import redirect_stdout
 from io import StringIO
 import json
+import os
 import tempfile
 import unittest
 
@@ -12,6 +13,23 @@ from server.main import create_app, log_security_event
 
 
 class ServerFactoryTests(unittest.TestCase):
+    def test_operator_file_must_remain_private_and_regular(self):
+        with tempfile.TemporaryDirectory(prefix="aetherterm-operator-file-") as directory:
+            path = Path(directory) / "operator.json"
+            initialize_operator(path, "private-test-password")
+            auth = OperatorAuth(path)
+            self.assertTrue(auth.verify_password("private-test-password"))
+            os.chmod(path, 0o644)
+            self.assertFalse(auth.verify_password("private-test-password"))
+            os.chmod(path, 0o600)
+            saved = Path(directory) / "saved-operator.json"
+            path.rename(saved)
+            path.symlink_to(saved)
+            self.assertFalse(auth.verify_password("private-test-password"))
+            path.unlink()
+            saved.rename(path)
+            self.assertTrue(auth.verify_password("private-test-password"))
+
     def test_operator_sessions_expire_and_remain_bounded(self):
         with tempfile.TemporaryDirectory(prefix="aetherterm-operator-") as directory:
             operator_file = Path(directory) / "operator.json"

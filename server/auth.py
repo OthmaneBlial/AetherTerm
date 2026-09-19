@@ -11,6 +11,7 @@ import secrets
 import time
 
 from .limits import SlidingWindowLimiter
+from .private_files import read_private_text
 
 
 COOKIE_NAME = "aetherterm_session"
@@ -55,19 +56,19 @@ class OperatorAuth:
         self.sessions: dict[str, float] = {}
         self.sockets: dict[str, set] = {}
         self.login_attempts = SlidingWindowLimiter(5, 300)
-        self._record_signature: tuple[int, int] | None = None
+        self._record_signature: tuple[int, int, int, int] | None = None
 
     def configured(self) -> bool:
         return self.path.is_file()
 
     def _load_record(self) -> dict | None:
         try:
-            stat = self.path.stat()
-            signature = (stat.st_mtime_ns, stat.st_size)
+            info = self.path.lstat()
+            signature = (info.st_ino, info.st_mtime_ns, info.st_ctime_ns, info.st_size)
             if self._record_signature is not None and signature != self._record_signature:
                 self.sessions.clear()
             self._record_signature = signature
-            record = json.loads(self.path.read_text(encoding="utf-8"))
+            record = json.loads(read_private_text(self.path, 16 * 1024))
             if record.get("version") != 1:
                 return None
             return record

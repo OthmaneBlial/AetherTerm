@@ -15,6 +15,7 @@ import tempfile
 import time
 
 from .auth import operator_file
+from .private_files import read_private_text
 
 
 DEVICE_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}\Z")
@@ -30,9 +31,11 @@ def _digest(token: str) -> str:
 
 
 def _load(path: Path) -> dict:
-    if not path.exists():
+    try:
+        contents = read_private_text(path, 1024 * 1024)
+    except FileNotFoundError:
         return {"version": 1, "devices": {}}
-    data = json.loads(path.read_text(encoding="utf-8"))
+    data = json.loads(contents)
     if data.get("version") != 1 or not isinstance(data.get("devices"), dict):
         raise ValueError("Invalid agent registry")
     return data

@@ -24,6 +24,17 @@ class AgentCredentialTests(unittest.TestCase):
             self.assertIsNone(registry.authenticate("linux-two", token))
             self.assertEqual(registry.visible_devices(), [{"deviceId": "linux-one", "description": "Build host"}])
 
+            os.chmod(registry_path, 0o644)
+            self.assertIsNone(registry.authenticate("linux-one", token))
+            self.assertEqual(registry.visible_devices(), [])
+            os.chmod(registry_path, 0o600)
+            saved_registry = base / "saved-agents.json"
+            registry_path.rename(saved_registry)
+            registry_path.symlink_to(saved_registry)
+            self.assertIsNone(registry.authenticate("linux-one", token))
+            registry_path.unlink()
+            saved_registry.rename(registry_path)
+
             os.chmod(original_file, 0o644)
             with self.assertRaises(ValueError):
                 read_token_file(original_file)

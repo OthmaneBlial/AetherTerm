@@ -4,7 +4,7 @@ AetherTerm gives a browser control over a shell running as the agent's operating
 
 ## Identities and permissions
 
-- One operator password is stored as a salted scrypt verifier in `~/.config/aetherterm/operator.json` by default. The setup CLI creates it with mode `0600`. The server retains browser sessions in memory for at most eight hours; logout and a change to the operator file revoke them. A restart also removes them.
+- One operator password is stored as a salted scrypt verifier in `~/.config/aetherterm/operator.json` by default. The setup CLI creates it with mode `0600`. The server refuses symlinks and identity files accessible to another user. It retains browser sessions in memory for at most eight hours; logout and a change to the operator file revoke them. A restart also removes them.
 - Every agent ID has a separate random credential. The server stores its SHA-256 digest in `~/.config/aetherterm/agents.json`, created with mode `0600`; the agent reads a private regular token file owned by its OS user. The secret is not placed in command arguments, browser code, URLs or logs.
 - The sole operator can start a shell on **every active enrolled agent**. There are no per-device operator roles. Browser WebSocket connections own their own shell sessions; knowing another connection's session ID does not authorize input, resize or close.
 - A shell inherits the agent process user's permissions. Use a dedicated, least-privileged account where practical. AetherTerm does not sandbox commands, separate tenants or mediate file access.
