@@ -48,8 +48,16 @@ sessions = {}  # session_id: {'device_id': str, 'web_ws': WebSocket, 'ready': bo
 device_last_seen = {}  # device_id: Unix timestamp, only for this server process
 device_descriptions = {}  # agent-supplied fallback, never an identity claim
 
+SEND_TIMEOUT = 3
+
+
+async def send_json(websocket: WebSocket, message: dict, timeout: float = SEND_TIMEOUT) -> None:
+    """A slow peer cannot hold a browser or agent receive loop indefinitely."""
+    await asyncio.wait_for(websocket.send_text(json.dumps(message)), timeout=timeout)
+
+
 async def send_error(websocket: WebSocket, message: str) -> None:
-    await websocket.send_text(json.dumps({"type": "error", "message": message}))
+    await send_json(websocket, {"type": "error", "message": message})
 
 
 async def send_to_browser(session_id: str, message: dict) -> bool:
@@ -58,15 +66,14 @@ async def send_to_browser(session_id: str, message: dict) -> bool:
     if session is None:
         return False
     try:
-        await asyncio.wait_for(session['web_ws'].send_text(json.dumps(message)), timeout=3)
+        await send_json(session['web_ws'], message)
         return True
     except Exception:
         sessions.pop(session_id, None)
         device_socket = devices.get(session['device_id'])
         if device_socket:
             try:
-                await asyncio.wait_for(device_socket.send_text(json.dumps(
-                    {"type": "close_session", "sessionId": session_id})), timeout=3)
+                await send_json(device_socket, {"type": "close_session", "sessionId": session_id})
             except Exception:
                 pass
         return False
@@ -92,8 +99,7 @@ async def expire_pending_session(session_id: str) -> None:
         device_socket = devices.get(session['device_id'])
         if device_socket:
             try:
-                await asyncio.wait_for(device_socket.send_text(json.dumps(
-                    {"type": "close_session", "sessionId": session_id})), timeout=3)
+                await send_json(device_socket, {"type": "close_session", "sessionId": session_id})
             except Exception:
                 pass
 
@@ -250,8 +256,8 @@ async def web_websocket(websocket: WebSocket):
                         "connected": device_id in device_list,
                         "lastSeen": device_last_seen.get(device_id),
                     })
-                await websocket.send_text(json.dumps({"type": "device_list", "devices": device_list,
-                                                   "deviceDetails": device_details}))
+                await send_json(websocket, {"type": "device_list", "devices": device_list,
+                                            "deviceDetails": device_details})
             elif msg['type'] == 'start_session':
                 device_id = msg['deviceId']
                 if not active_device(device_id):
@@ -262,10 +268,9 @@ async def web_websocket(websocket: WebSocket):
                     continue
                 session_id = str(uuid.uuid4())
                 sessions[session_id] = {'device_id': device_id, 'web_ws': websocket, 'ready': False}
-                await websocket.send_text(json.dumps({"type": "session_started", "sessionId": session_id, "deviceId": device_id}))
+                await send_json(websocket, {"type": "session_started", "sessionId": session_id, "deviceId": device_id})
                 try:
-                    await asyncio.wait_for(devices[device_id].send_text(json.dumps(
-                        {"type": "login_request", "sessionId": session_id})), timeout=3)
+                    await send_json(devices[device_id], {"type": "login_request", "sessionId": session_id})
                 except Exception:
                     await send_to_browser(session_id, {"type": "session_closed", "sessionId": session_id,
                                                        "reason": "Agent unavailable"})
@@ -284,14 +289,14 @@ async def web_websocket(websocket: WebSocket):
                     await send_error(websocket, "Session not ready")
                     continue
                 device_id = sessions[session_id]['device_id']
-                await devices[device_id].send_text(json.dumps({"type": "term_data", "sessionId": session_id, "data": input_b64}))
+                await send_json(devices[device_id], {"type": "term_data", "sessionId": session_id, "data": input_b64})
             elif msg['type'] == 'resize':
                 session_id = msg['sessionId']
                 cols = msg.get('cols', 80)
                 rows = msg.get('rows', 24)
                 if session_id in sessions and sessions[session_id]['web_ws'] is websocket and sessions[session_id]['ready'] and active_device(sessions[session_id]['device_id']):
                     device_id = sessions[session_id]['device_id']
-                    await devices[device_id].send_text(json.dumps({"type": "resize", "sessionId": session_id, "cols": cols, "rows": rows}))
+                    await send_json(devices[device_id], {"type": "resize", "sessionId": session_id, "cols": cols, "rows": rows})
                 else:
                     await send_error(websocket, "Session unavailable")
             elif msg['type'] == 'close_session':
@@ -303,8 +308,8 @@ async def web_websocket(websocket: WebSocket):
                 del sessions[session_id]
                 device_socket = devices.get(session['device_id'])
                 if device_socket:
-                    await device_socket.send_text(json.dumps({"type": "close_session", "sessionId": session_id}))
-                await websocket.send_text(json.dumps({"type": "session_closed", "sessionId": session_id}))
+                    await send_json(device_socket, {"type": "close_session", "sessionId": session_id})
+                await send_json(websocket, {"type": "session_closed", "sessionId": session_id})
     except Exception as e:
         log_security_event("WEB_ERROR", client_ip, str(e))
         print(f"Web WS error: {e}")
@@ -318,7 +323,7 @@ async def web_websocket(websocket: WebSocket):
             device_socket = devices.get(session['device_id'])
             if device_socket:
                 try:
-                    await device_socket.send_text(json.dumps({"type": "close_session", "sessionId": sid}))
+                    await send_json(device_socket, {"type": "close_session", "sessionId": sid})
                 except Exception:
                     pass
 
@@ -375,13 +380,13 @@ async def client_websocket(websocket: WebSocket):
                 candidate_hash = agent_registry.authenticate(requested_id, msg.get('token', ''))
                 if candidate_hash is None:
                     log_security_event("INVALID_AGENT_CREDENTIAL", client_ip)
-                    await websocket.send_text(json.dumps({"type": "error", "message": "Invalid device credential"}))
+                    await send_json(websocket, {"type": "error", "message": "Invalid device credential"})
                     await websocket.close(code=1008, reason="Authentication failed")
                     return
 
                 if requested_id in devices:
                     log_security_event("DUPLICATE_DEVICE", client_ip, f"Device: {requested_id}")
-                    await websocket.send_text(json.dumps({"type": "error", "message": "Device ID already in use"}))
+                    await send_json(websocket, {"type": "error", "message": "Device ID already in use"})
                     await websocket.close(code=1008, reason="Device ID conflict")
                     return
 
@@ -397,7 +402,7 @@ async def client_websocket(websocket: WebSocket):
                 device_last_seen[device_id] = time.time()
                 device_descriptions[device_id] = msg.get('description', '')
                 log_security_event("CLIENT_REGISTERED", client_ip, f"Device: {device_id}")
-                await websocket.send_text(json.dumps({"type": "registered"}))
+                await send_json(websocket, {"type": "registered"})
 
             elif device_id is None:
                 await websocket.close(code=1008, reason="Registration required")
@@ -427,7 +432,7 @@ async def client_websocket(websocket: WebSocket):
                     sessions.pop(session_id, None)
 
             elif msg['type'] == 'heartbeat':
-                await websocket.send_text(json.dumps({"type": "heartbeat_ack"}))
+                await send_json(websocket, {"type": "heartbeat_ack"})
 
     except Exception as e:
         log_security_event("CLIENT_ERROR", client_ip, str(e))
@@ -441,8 +446,8 @@ async def client_websocket(websocket: WebSocket):
                 if session['device_id'] == device_id:
                     del sessions[session_id]
                     try:
-                        await session['web_ws'].send_text(json.dumps({"type": "session_closed", "sessionId": session_id,
-                                                                      "reason": "Agent disconnected"}))
+                        await send_json(session['web_ws'], {"type": "session_closed", "sessionId": session_id,
+                                                            "reason": "Agent disconnected"})
                     except Exception:
                         pass
         log_security_event("CLIENT_CONNECTION_CLOSED", client_ip, f"Device: {device_id}")

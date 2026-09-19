@@ -475,7 +475,12 @@ class BrowserAuthTests(unittest.IsolatedAsyncioTestCase):
         finally:
             if agent.poll() is None:
                 os.killpg(agent.pid, signal.SIGTERM)
-                agent.wait(timeout=5)
+                try:
+                    agent.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    os.killpg(agent.pid, signal.SIGKILL)
+                    agent.wait(timeout=5)
+                    self.fail("Agent did not stop within five seconds after SIGTERM")
             agent_log.close()
 
     async def test_unready_agent_session_times_out_and_frees_capacity(self):
