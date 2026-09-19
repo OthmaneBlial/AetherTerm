@@ -7,11 +7,11 @@ import base64
 import errno
 from pathlib import Path
 import stat
-import ipaddress
 import ssl
 import signal
 from websockets.typing import Subprotocol
 
+from client.config import AgentConfig, server_uri
 from client.sessions import PtySession
 
 WEBSOCKET_SUBPROTOCOL = Subprotocol("aetherterm.v1")
@@ -36,19 +36,6 @@ def read_token_file(path: Path) -> str:
     if not token or len(token) > 256 or any(character.isspace() for character in token):
         raise ValueError("Token file contains an invalid credential")
     return token
-
-def server_uri(host: str, port: int, tls: bool) -> str:
-    if not host or any(character in host for character in "/@?# ") or not 1 <= port <= 65535:
-        raise ValueError("Invalid server host or port")
-    try:
-        loopback = ipaddress.ip_address(host).is_loopback
-    except ValueError:
-        loopback = host.lower() == "localhost"
-    if not tls and not loopback:
-        raise ValueError("Remote agents require --tls and a verified WSS server")
-    formatted_host = f"[{host}]" if ":" in host and not host.startswith("[") else host
-    return f"{'wss' if tls else 'ws'}://{formatted_host}:{port}/client"
-
 
 async def connect(host, port, device_id, token, description, *, tls=False, ca_file=None):
     uri = server_uri(host, port, tls)
@@ -155,13 +142,11 @@ def main():
     parser.add_argument('--ca-file', type=Path, help='Optional trusted CA bundle for WSS')
     args = parser.parse_args()
 
+    config = AgentConfig(args.host, args.port, args.device_id, args.token_file,
+                         args.description, args.tls, args.ca_file)
     try:
-        token = read_token_file(args.token_file)
-        server_uri(args.host, args.port, args.tls)
-        if args.ca_file and not args.tls:
-            raise ValueError("--ca-file requires --tls")
-        if args.ca_file and not args.ca_file.is_file():
-            raise ValueError("CA file not found")
+        config.validate()
+        token = read_token_file(config.token_file)
     except (OSError, UnicodeError, ValueError) as exc:
         parser.error(str(exc))
     async def run_agent():
@@ -169,7 +154,8 @@ def main():
         if task is None:
             raise RuntimeError("Agent event loop has no current task")
         asyncio.get_running_loop().add_signal_handler(signal.SIGTERM, task.cancel)
-        await connect(args.host, args.port, args.device_id, token, args.description, tls=args.tls, ca_file=args.ca_file)
+        await connect(config.host, config.port, config.device_id, token, config.description,
+                      tls=config.tls, ca_file=config.ca_file)
 
     try:
         asyncio.run(run_agent())
