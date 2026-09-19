@@ -54,7 +54,7 @@ Open `http://127.0.0.1:8001/web/` and sign in. Use `aetherterm-admin rotate loca
 
 The terminal UI is bundled locally; no CDN connection is needed. To rebuild it after changing `web/src/`, run `cd web && npm ci && npm run build`. The checked-in `web/assets/` files let the Python quickstart work without Node. xterm.js and its fit addon are MIT licensed; their notices are in `web/licenses/`.
 
-The [installation guide](docs/INSTALL.md) describes the wheel and the Linux server container currently exercised in CI. Neither is a published release download yet.
+The [installation guide](docs/INSTALL.md) describes the wheel, Linux server container and a tested Linux x86_64 agent binary retained as a short-lived CI artifact. None is a published release download yet.
 
 The agent reconnects automatically after a temporary server outage with bounded backoff. Existing shells close when either side disconnects; open a new session after reconnection. An invalid agent credential or rejected WSS certificate stops the agent so the operator can correct the configuration.
 
@@ -72,6 +72,6 @@ AetherTerm does not speak SSH. Compatibility, security and ease-of-use compariso
 | Browser access | Password login, cookie session, same-origin WebSocket and negative cross-browser integration test. The sole operator can access every enrolled active device. | Expiry/revocation under load, external deployment and independent security review. |
 | Agent identity | Per-device credential-file enrollment, rotation and revocation tested locally. | Remote encrypted transport, Linux installation and operating guidance. |
 | Transport | Remote cleartext refused in code; direct TLS and a local Caddy HTTPS/WSS proxy test with certificate validation passed. | Public certificate, external network and graphical browser validation. |
-| Packaging and automation | A wheel installed in clean Python 3.13 environments served its bundled UI and completed an authorized PTY round trip on macOS and Ubuntu 24.04 CI. A non-root server container, dependency scans and the Chromium journey passed in the [CI run for `dbaf5e9`](https://github.com/OthmaneBlial/AetherTerm/actions/runs/35446357041). No published release artifact is verified. | Standalone Linux agent, tested downloads, review gates and release checks. |
+| Packaging and automation | A wheel installed in clean Python 3.13 environments served its bundled UI and completed an authorized PTY round trip on macOS and Ubuntu 24.04 CI. A non-root server container, dependency scans, local-only Web assets and the Chromium journey passed in [run 35446887099](https://github.com/OthmaneBlial/AetherTerm/actions/runs/35446887099). A Linux x86_64 agent binary opened a real PTY in [run 35446843613](https://github.com/OthmaneBlial/AetherTerm/actions/runs/35446843613). No published release artifact is verified. | Publicly tested downloads, review gates and release checks. |
 
-The MIT license is in [LICENSE](LICENSE). Contributions are welcome once the security and test setup are documented; please avoid deploying this revision to a reachable network. The complete sequence is tracked in [ROADMAP.md](ROADMAP.md).
+The MIT license is in [LICENSE](LICENSE). The [contribution guide](CONTRIBUTING.md) covers setup and safe reporting; please avoid deploying this revision to a reachable network. The complete sequence is tracked in [ROADMAP.md](ROADMAP.md).

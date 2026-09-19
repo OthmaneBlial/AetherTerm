@@ -15,7 +15,7 @@ python -m pip install dist/aetherterm-0.1.0a0-py3-none-any.whl
 python -m pip check
 ```
 
-The three entry points are `aetherterm-admin`, `aetherterm-server` and `aetherterm-agent`. The CI installs the built wheel in a **separate clean virtual environment outside the checkout** and completes an authenticated server–agent–PTY round trip. This is an installable Python package, not an autonomous binary. The version and filename here must be updated when the package version changes.
+The three entry points are `aetherterm-admin`, `aetherterm-server` and `aetherterm-agent`. The CI installs the built wheel in a **separate clean virtual environment outside the checkout** and completes an authenticated server–agent–PTY round trip. The wheel requires Python; the separate Linux agent binary is described below. The version and filename here must be updated when the package version changes.
 
 ## Linux x86_64 agent binary in CI
 
