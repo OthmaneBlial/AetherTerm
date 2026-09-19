@@ -371,6 +371,23 @@ class BrowserAuthTests(unittest.IsolatedAsyncioTestCase):
                       and after_cpu is not None else
                       f"Slow browser burst: 1.6 MiB relayed; sibling latency <= {worst_healthy_delay:.2f}s")
 
+    async def test_browser_reconnect_burst_is_bounded_without_blocking_agent(self):
+        origin = f"http://127.0.0.1:{self.port}"
+        status, headers = self.request("POST", "/login", "password=a-test-password-only", {"Origin": origin})
+        self.assertEqual(status, 303)
+        cookie = headers["set-cookie"].split(";", 1)[0]
+        browser_uri = f"ws://127.0.0.1:{self.port}/ws"
+        for _ in range(10):
+            async with connect(browser_uri, origin=origin, additional_headers={"Cookie": cookie}) as browser:
+                await browser.send(json.dumps({"type": "list_devices"}))
+                self.assertEqual(json.loads(await browser.recv())["type"], "device_list")
+        with self.assertRaises(InvalidStatus):
+            async with connect(browser_uri, origin=origin, additional_headers={"Cookie": cookie}):
+                pass
+        async with connect(f"ws://127.0.0.1:{self.port}/client") as agent:
+            await agent.send(json.dumps({"type": "register", "deviceId": "test-agent", "token": self.agent_token}))
+            self.assertEqual(json.loads(await agent.recv())["type"], "registered")
+
     async def test_real_agent_sessions_are_isolated_and_closed(self):
         agent, agent_log = self.start_real_agent()
         origin = f"http://127.0.0.1:{self.port}"
