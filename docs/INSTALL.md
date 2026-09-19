@@ -2,6 +2,8 @@
 
 There is **no verified public release download** yet. The commands below build from this checkout. Only Python 3.13 is declared; the real PTY integration runs on Ubuntu 24.04 CI and macOS development. Follow the [local quickstart](QUICKSTART.md) for identity setup and first use.
 
+On 2026-09-19, a fresh shallow clone of `main` at commit `7e2c281` was installed in a new macOS Python 3.13 environment with the hashed runtime lock. The installed package passed the documentation-link check and `python -m scripts.demo_local --check`, including disposable server and agent startup/cleanup. This is macOS onboarding evidence; it does not replace the pending human-led Linux installation review.
+
 ## Python wheel
 
 The checked-in Web bundle is included in the Python wheel. From a checkout:
