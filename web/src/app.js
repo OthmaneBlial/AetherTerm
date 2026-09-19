@@ -217,7 +217,7 @@ function handleMessage(event) {
 function connect() {
   clearTimeout(reconnectTimer)
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-  socket = new WebSocket(`${protocol}//${window.location.host}/ws`)
+  socket = new WebSocket(`${protocol}//${window.location.host}/ws`, 'aetherterm.v1')
   setConnection('Connecting', 'connecting')
   socket.addEventListener('open', () => {
     online = true

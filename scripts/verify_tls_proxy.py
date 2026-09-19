@@ -9,6 +9,7 @@ This proves a local proxy configuration, not public DNS or another physical host
 import argparse
 import asyncio
 import base64
+from functools import partial
 import http.client
 import json
 import os
@@ -29,6 +30,9 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from server.agents import issue_credential  # noqa: E402
 from server.auth import initialize_operator  # noqa: E402
+from server.protocol import WEBSOCKET_SUBPROTOCOL  # noqa: E402
+
+connect = partial(websockets.connect, subprotocols=[WEBSOCKET_SUBPROTOCOL])
 
 
 def free_port() -> int:
@@ -70,14 +74,14 @@ async def browser_round_trip(port: int, context: ssl.SSLContext, cookie: str) ->
     origin = f"https://localhost:{port}"
     uri = f"wss://localhost:{port}/ws"
     try:
-        async with websockets.connect(uri, origin=origin, ssl=ssl.create_default_context()):
+        async with connect(uri, origin=origin, ssl=ssl.create_default_context()):
             pass
     except ssl.SSLCertVerificationError:
         pass
     else:
         raise AssertionError("Untrusted proxy certificate was accepted")
 
-    async with websockets.connect(uri, origin=origin, ssl=context, additional_headers={"Cookie": cookie}) as browser:
+    async with connect(uri, origin=origin, ssl=context, additional_headers={"Cookie": cookie}) as browser:
         for _ in range(100):
             await browser.send(json.dumps({"type": "list_devices"}))
             listing = json.loads(await browser.recv())

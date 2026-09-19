@@ -2,6 +2,7 @@
 
 import asyncio
 import base64
+from functools import partial
 import http.client
 import json
 import os
@@ -16,6 +17,9 @@ import time
 import websockets
 
 from server.auth import initialize_operator
+from server.protocol import WEBSOCKET_SUBPROTOCOL
+
+connect = partial(websockets.connect, subprotocols=[WEBSOCKET_SUBPROTOCOL])
 
 
 def request(port, method, path, *, body=None, headers=None):
@@ -41,7 +45,7 @@ def stop(process):
 
 async def exercise(port, cookie):
     origin = f"http://127.0.0.1:{port}"
-    async with websockets.connect(f"ws://127.0.0.1:{port}/ws", origin=origin,
+    async with connect(f"ws://127.0.0.1:{port}/ws", origin=origin,
                                   additional_headers={"Cookie": cookie}) as browser:
         for _ in range(100):
             await browser.send(json.dumps({"type": "list_devices"}))

@@ -10,6 +10,8 @@ import ipaddress
 import ssl
 import signal
 
+WEBSOCKET_SUBPROTOCOL = "aetherterm.v1"
+
 if __package__:
     from .sessions import PtySession
 else:
@@ -47,7 +49,8 @@ async def connect(host, port, device_id, token, description, *, tls=False, ca_fi
     backoff = 1
     while True:
         try:
-            async with websockets.connect(uri, ssl=tls_context, open_timeout=5, close_timeout=2) as websocket:
+            async with websockets.connect(uri, ssl=tls_context, open_timeout=5, close_timeout=2,
+                                          subprotocols=[WEBSOCKET_SUBPROTOCOL]) as websocket:
                 # register
                 await websocket.send(json.dumps({"type": "register", "deviceId": device_id, "token": token, "description": description}))
                 response = await websocket.recv()

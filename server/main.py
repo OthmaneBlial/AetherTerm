@@ -19,7 +19,7 @@ from .limits import (SlidingWindowLimiter, MAX_CONNECTED_AGENTS,
                      MAX_OPEN_AGENT_SOCKETS, MAX_OPEN_BROWSER_SOCKETS,
                      MAX_SESSIONS_PER_AGENT, MAX_SESSIONS_PER_BROWSER, MAX_SESSIONS_TOTAL,
                      SESSION_START_TIMEOUT)
-from .protocol import ProtocolError, parse_message
+from .protocol import ProtocolError, WEBSOCKET_SUBPROTOCOL, parse_message
 from .state import ServerState
 
 def log_security_event(event: str, client_ip: str = "unknown", details: str = ""):
@@ -104,6 +104,11 @@ def active_device(state: ServerState, device_id: str) -> bool:
 
 def same_origin(request: Request) -> bool:
     return request.headers.get("origin") == f"{request.url.scheme}://{request.headers.get('host')}"
+
+
+def current_protocol(websocket: WebSocket) -> bool:
+    offered = websocket.headers.get("sec-websocket-protocol", "")
+    return WEBSOCKET_SUBPROTOCOL in {part.strip() for part in offered.split(",")}
 
 
 def login_page(state: ServerState, message: str = "") -> HTMLResponse:
@@ -206,6 +211,9 @@ async def web_websocket(websocket: WebSocket):
     if not transport_allowed(websocket.url.scheme, client_ip):
         await websocket.close(code=1008, reason="WSS required for remote access")
         return
+    if not current_protocol(websocket):
+        await websocket.close(code=1002, reason="Unsupported AetherTerm protocol")
+        return
     expected_origin = f"{'https' if websocket.url.scheme == 'wss' else 'http'}://{websocket.headers.get('host')}"
     session_key = operator_auth.session_key(websocket.cookies.get(COOKIE_NAME))
     if websocket.headers.get("origin") != expected_origin or session_key is None:
@@ -224,7 +232,7 @@ async def web_websocket(websocket: WebSocket):
 
     state.browser_sockets.add(websocket)
     try:
-        await websocket.accept()
+        await websocket.accept(subprotocol=WEBSOCKET_SUBPROTOCOL)
     except BaseException:
         state.browser_sockets.discard(websocket)
         raise
@@ -352,6 +360,9 @@ async def client_websocket(websocket: WebSocket):
     if not transport_allowed(websocket.url.scheme, client_ip):
         await websocket.close(code=1008, reason="WSS required for remote access")
         return
+    if not current_protocol(websocket):
+        await websocket.close(code=1002, reason="Unsupported AetherTerm protocol")
+        return
 
     # Security check: Rate limiting for client connections too
     if not agent_connections.allow(client_ip):
@@ -364,7 +375,7 @@ async def client_websocket(websocket: WebSocket):
 
     state.agent_sockets.add(websocket)
     try:
-        await websocket.accept()
+        await websocket.accept(subprotocol=WEBSOCKET_SUBPROTOCOL)
     except BaseException:
         state.agent_sockets.discard(websocket)
         raise

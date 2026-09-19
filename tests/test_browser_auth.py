@@ -2,6 +2,7 @@
 
 import asyncio
 import base64
+from functools import partial
 import http.client
 import json
 import os
@@ -21,9 +22,11 @@ from websockets.exceptions import ConnectionClosed, InvalidStatus
 
 from server.agents import issue_credential, revoke_device
 from server.auth import COOKIE_NAME, initialize_operator
+from server.protocol import WEBSOCKET_SUBPROTOCOL
 
 
 ROOT = Path(__file__).resolve().parents[1]
+connect = partial(websockets.connect, subprotocols=[WEBSOCKET_SUBPROTOCOL])
 
 
 class BrowserAuthTests(unittest.IsolatedAsyncioTestCase):
@@ -109,7 +112,7 @@ class BrowserAuthTests(unittest.IsolatedAsyncioTestCase):
         status, _ = self.request("GET", "/web/")
         self.assertEqual(status, 303)
         with self.assertRaises(InvalidStatus):
-            async with websockets.connect(uri, origin=origin):
+            async with connect(uri, origin=origin):
                 pass
 
         status, _ = self.request("POST", "/login", "password=a-test-password-only", {"Origin": "http://wrong.example"})
@@ -123,13 +126,21 @@ class BrowserAuthTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("httponly", headers["set-cookie"].lower())
         self.assertEqual(self.request("GET", "/web/", headers={"Cookie": cookie})[0], 200)
         with self.assertRaises(InvalidStatus):
-            async with websockets.connect(uri, origin="http://wrong.example", additional_headers={"Cookie": cookie}):
+            async with websockets.connect(uri, origin=origin, additional_headers={"Cookie": cookie}):
+                pass
+        with self.assertRaises(InvalidStatus):
+            async with websockets.connect(f"ws://127.0.0.1:{self.port}/client"):
+                pass
+        with self.assertRaises(InvalidStatus):
+            async with connect(uri, origin="http://wrong.example", additional_headers={"Cookie": cookie}):
                 pass
 
-        async with websockets.connect(f"ws://127.0.0.1:{self.port}/client") as agent:
+        async with connect(f"ws://127.0.0.1:{self.port}/client") as agent:
+            self.assertEqual(agent.subprotocol, WEBSOCKET_SUBPROTOCOL)
             await agent.send(json.dumps({"type": "register", "deviceId": "test-agent", "token": self.agent_token}))
             self.assertEqual(json.loads(await agent.recv())["type"], "registered")
-            async with websockets.connect(uri, origin=origin, additional_headers={"Cookie": cookie}) as owner:
+            async with connect(uri, origin=origin, additional_headers={"Cookie": cookie}) as owner:
+                self.assertEqual(owner.subprotocol, WEBSOCKET_SUBPROTOCOL)
                 await owner.send(json.dumps({"type": "list_devices"}))
                 self.assertEqual(json.loads(await owner.recv())["devices"], ["test-agent"])
                 await owner.send(json.dumps({"type": "start_session", "deviceId": "test-agent"}))
@@ -139,7 +150,7 @@ class BrowserAuthTests(unittest.IsolatedAsyncioTestCase):
                 await agent.send(json.dumps({"type": "session_ready", "sessionId": started["sessionId"]}))
                 self.assertEqual(json.loads(await owner.recv())["type"], "session_ready")
 
-                async with websockets.connect(uri, origin=origin, additional_headers={"Cookie": cookie}) as other:
+                async with connect(uri, origin=origin, additional_headers={"Cookie": cookie}) as other:
                     intruder_data = base64.b64encode(b"intruder\n").decode()
                     await other.send(json.dumps({"type": "term_input", "sessionId": started["sessionId"], "input": intruder_data}))
                     self.assertEqual(json.loads(await other.recv())["message"], "Session unavailable")
@@ -167,7 +178,7 @@ class BrowserAuthTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(status, 303)
         cookie = headers["set-cookie"].split(";", 1)[0]
         uri = f"ws://127.0.0.1:{self.port}/ws"
-        async with websockets.connect(uri, origin=origin, additional_headers={"Cookie": cookie}) as browser:
+        async with connect(uri, origin=origin, additional_headers={"Cookie": cookie}) as browser:
             replacement = Path(self.temp.name) / "new-operator.json"
             initialize_operator(replacement, "new-test-password-only")
             os.replace(replacement, self.operator_file)
@@ -184,26 +195,26 @@ class BrowserAuthTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(status, 303)
         cookie = headers["set-cookie"].split(";", 1)[0]
 
-        async with websockets.connect(agent_uri) as wrong:
+        async with connect(agent_uri) as wrong:
             await wrong.send(json.dumps({"type": "register", "deviceId": "other-agent", "token": self.agent_token}))
             self.assertEqual(json.loads(await wrong.recv())["message"], "Invalid device credential")
             with self.assertRaises(ConnectionClosed):
                 await wrong.recv()
 
-        async with websockets.connect(agent_uri) as agent_a:
+        async with connect(agent_uri) as agent_a:
             await agent_a.send(json.dumps({"type": "register", "deviceId": "test-agent", "token": self.agent_token}))
             self.assertEqual(json.loads(await agent_a.recv())["type"], "registered")
-            async with websockets.connect(agent_uri) as duplicate:
+            async with connect(agent_uri) as duplicate:
                 await duplicate.send(json.dumps({"type": "register", "deviceId": "test-agent", "token": self.agent_token}))
                 self.assertEqual(json.loads(await duplicate.recv())["message"], "Device ID already in use")
 
             second_file = Path(self.temp.name) / "second.token"
             issue_credential(self.agents_file, "second-agent", second_file)
             second_token = second_file.read_text(encoding="utf-8").strip()
-            async with websockets.connect(agent_uri) as agent_b:
+            async with connect(agent_uri) as agent_b:
                 await agent_b.send(json.dumps({"type": "register", "deviceId": "second-agent", "token": second_token}))
                 self.assertEqual(json.loads(await agent_b.recv())["type"], "registered")
-                async with websockets.connect(f"ws://127.0.0.1:{self.port}/ws", origin=origin, additional_headers={"Cookie": cookie}) as browser:
+                async with connect(f"ws://127.0.0.1:{self.port}/ws", origin=origin, additional_headers={"Cookie": cookie}) as browser:
                     await browser.send(json.dumps({"type": "list_devices"}))
                     self.assertEqual(set(json.loads(await browser.recv())["devices"]), {"test-agent", "second-agent"})
                     await browser.send(json.dumps({"type": "start_session", "deviceId": "second-agent"}))
@@ -221,19 +232,19 @@ class BrowserAuthTests(unittest.IsolatedAsyncioTestCase):
                 with self.assertRaises(ConnectionClosed):
                     await asyncio.wait_for(agent_a.recv(), 3)
 
-        async with websockets.connect(agent_uri) as old_credential:
+        async with connect(agent_uri) as old_credential:
             await old_credential.send(json.dumps({"type": "register", "deviceId": "test-agent", "token": self.agent_token}))
             self.assertEqual(json.loads(await old_credential.recv())["message"], "Invalid device credential")
 
         new_token = rotated_file.read_text(encoding="utf-8").strip()
-        async with websockets.connect(agent_uri) as rotated:
+        async with connect(agent_uri) as rotated:
             await rotated.send(json.dumps({"type": "register", "deviceId": "test-agent", "token": new_token}))
             self.assertEqual(json.loads(await rotated.recv())["type"], "registered")
             revoke_device(self.agents_file, "test-agent")
             with self.assertRaises(ConnectionClosed):
                 await asyncio.wait_for(rotated.recv(), 3)
 
-        async with websockets.connect(agent_uri) as revoked:
+        async with connect(agent_uri) as revoked:
             await revoked.send(json.dumps({"type": "register", "deviceId": "test-agent", "token": new_token}))
             self.assertEqual(json.loads(await revoked.recv())["message"], "Invalid device credential")
         self.server_log.flush()
@@ -250,12 +261,12 @@ class BrowserAuthTests(unittest.IsolatedAsyncioTestCase):
         cookie = headers["set-cookie"].split(";", 1)[0]
         browser_uri = f"ws://127.0.0.1:{self.port}/ws"
         agent_uri = f"ws://127.0.0.1:{self.port}/client"
-        async with websockets.connect(agent_uri) as agent:
+        async with connect(agent_uri) as agent:
             await agent.send("not json")
             self.assertEqual(json.loads(await agent.recv())["message"], "Invalid JSON")
             await agent.send(json.dumps({"type": "register", "deviceId": "test-agent", "token": self.agent_token}))
             self.assertEqual(json.loads(await agent.recv())["type"], "registered")
-            async with websockets.connect(browser_uri, origin=origin, additional_headers={"Cookie": cookie}) as browser:
+            async with connect(browser_uri, origin=origin, additional_headers={"Cookie": cookie}) as browser:
                 for invalid in ("not json", json.dumps({"type": []}), json.dumps({"type": "resize"})):
                     await browser.send(invalid)
                     self.assertEqual(json.loads(await browser.recv())["type"], "error")
@@ -308,8 +319,8 @@ class BrowserAuthTests(unittest.IsolatedAsyncioTestCase):
             return started["sessionId"]
 
         try:
-            async with websockets.connect(uri, origin=origin, additional_headers={"Cookie": cookie}) as first, \
-                       websockets.connect(uri, origin=origin, additional_headers={"Cookie": cookie}) as second:
+            async with connect(uri, origin=origin, additional_headers={"Cookie": cookie}) as first, \
+                       connect(uri, origin=origin, additional_headers={"Cookie": cookie}) as second:
                 for _ in range(40):
                     await first.send(json.dumps({"type": "list_devices"}))
                     if "test-agent" in json.loads(await first.recv())["devices"]:
@@ -408,7 +419,7 @@ class BrowserAuthTests(unittest.IsolatedAsyncioTestCase):
         async def signed_in_browser():
             status, headers = self.request("POST", "/login", "password=a-test-password-only", {"Origin": origin})
             self.assertEqual(status, 303)
-            return await websockets.connect(uri, origin=origin,
+            return await connect(uri, origin=origin,
                                             additional_headers={"Cookie": headers["set-cookie"].split(";", 1)[0]})
 
         async def wait_for_agent(browser):
@@ -499,7 +510,7 @@ class BrowserAuthTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(status, 303)
         cookie = headers["set-cookie"].split(";", 1)[0]
         try:
-            async with websockets.connect(f"ws://127.0.0.1:{self.port}/ws", origin=origin,
+            async with connect(f"ws://127.0.0.1:{self.port}/ws", origin=origin,
                                           additional_headers={"Cookie": cookie}) as browser:
                 for _ in range(100):
                     await browser.send(json.dumps({"type": "list_devices"}))
@@ -551,10 +562,10 @@ class BrowserAuthTests(unittest.IsolatedAsyncioTestCase):
         status, headers = self.request("POST", "/login", "password=a-test-password-only", {"Origin": origin})
         self.assertEqual(status, 303)
         cookie = headers["set-cookie"].split(";", 1)[0]
-        async with websockets.connect(f"ws://127.0.0.1:{self.port}/client") as agent:
+        async with connect(f"ws://127.0.0.1:{self.port}/client") as agent:
             await agent.send(json.dumps({"type": "register", "deviceId": "test-agent", "token": self.agent_token}))
             self.assertEqual(json.loads(await agent.recv())["type"], "registered")
-            async with websockets.connect(f"ws://127.0.0.1:{self.port}/ws", origin=origin,
+            async with connect(f"ws://127.0.0.1:{self.port}/ws", origin=origin,
                                           additional_headers={"Cookie": cookie}) as browser:
                 await browser.send(json.dumps({"type": "start_session", "deviceId": "test-agent"}))
                 session_id = json.loads(await browser.recv())["sessionId"]
@@ -578,7 +589,7 @@ class BrowserAuthTests(unittest.IsolatedAsyncioTestCase):
         status, headers = self.request("POST", "/login", "password=a-test-password-only", {"Origin": origin})
         self.assertEqual(status, 303)
         cookie = headers["set-cookie"].split(";", 1)[0]
-        async with websockets.connect(f"ws://127.0.0.1:{self.port}/ws", origin=origin,
+        async with connect(f"ws://127.0.0.1:{self.port}/ws", origin=origin,
                                       additional_headers={"Cookie": cookie}) as browser:
             await browser.send(json.dumps({"type": "list_devices"}))
             listing = json.loads(await browser.recv())
@@ -588,7 +599,7 @@ class BrowserAuthTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(listing["deviceDetails"][0]["description"], "Build host")
             self.assertNotIn(self.agent_token, json.dumps(listing))
             self.assertNotIn(second_token, json.dumps(listing))
-            async with websockets.connect(f"ws://127.0.0.1:{self.port}/client") as agent:
+            async with connect(f"ws://127.0.0.1:{self.port}/client") as agent:
                 await agent.send(json.dumps({"type": "register", "deviceId": "second-agent", "token": second_token}))
                 self.assertEqual(json.loads(await agent.recv())["type"], "registered")
                 await browser.send(json.dumps({"type": "list_devices"}))
@@ -612,7 +623,7 @@ class BrowserAuthTests(unittest.IsolatedAsyncioTestCase):
             status, headers = self.request("POST", "/login", "password=a-test-password-only", {"Origin": origin})
             self.assertEqual(status, 303)
             cookie = headers["set-cookie"].split(";", 1)[0]
-            async with websockets.connect(f"ws://127.0.0.1:{self.port}/ws", origin=origin,
+            async with connect(f"ws://127.0.0.1:{self.port}/ws", origin=origin,
                                           additional_headers={"Cookie": cookie}) as browser:
                 for _ in range(100):
                     await browser.send(json.dumps({"type": "list_devices"}))

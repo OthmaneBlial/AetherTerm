@@ -8,6 +8,8 @@ import uuid
 from .agents import DEVICE_ID
 from .limits import MAX_FRAME_BYTES, MAX_TERMINAL_BYTES
 
+WEBSOCKET_SUBPROTOCOL = "aetherterm.v1"
+
 
 class ProtocolError(ValueError):
     pass
