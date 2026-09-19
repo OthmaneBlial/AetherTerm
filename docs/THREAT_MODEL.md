@@ -1,6 +1,6 @@
 # Threat model and access contract
 
-Status: target for v1 implementation. The current prototype has hard-coded shared agent tokens, unauthenticated browser WebSockets and cleartext `ws://`; it is unsafe to expose beyond loopback.
+Status: target for v1 implementation. Browser sign-in and WebSocket ownership checks now have a local integration test. The prototype still has hard-coded shared agent tokens and cleartext `ws://`; it is unsafe to expose beyond loopback.
 
 ## Assets and trust boundaries
 

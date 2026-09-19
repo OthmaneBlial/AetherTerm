@@ -187,11 +187,10 @@
           }
         },
         mounted() {
-          this.ws = new WebSocket(
-            "ws://localhost:8001/ws"
-          )
+          const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:"
+          this.ws = new WebSocket(`${wsProtocol}//${window.location.host}/ws`)
           this.ws.onopen = () => {
-            console.log("Connected to the AetherTerm prototype; browser access is unauthenticated")
+            console.log("Connected to the AetherTerm operator console")
           }
           this.ws.onmessage =
             this.onMessage.bind(this)

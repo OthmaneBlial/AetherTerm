@@ -1,11 +1,15 @@
-from fastapi import FastAPI, WebSocket
+from fastapi import FastAPI, Request, WebSocket
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
 import asyncio
 import json
 import uuid
+from urllib.parse import parse_qs
+
+from .auth import COOKIE_NAME, SESSION_SECONDS, OperatorAuth, operator_file
 
 app = FastAPI()
+operator_auth = OperatorAuth(operator_file())
 
 import os
 import time
@@ -60,15 +64,93 @@ if os.path.exists(web_dir):
 else:
     print("Web directory not found!")
 
-print("AetherTerm prototype: browser access is unauthenticated; bind to loopback only.")
+print("AetherTerm prototype: operator login protects browser access; agent credentials still need replacement.")
 
 devices = {}  # device_id: websocket
 sessions = {}  # session_id: {'device_id': str, 'web_ws': WebSocket}
 active_connections = {}  # client_ip: connection_info
 
+
+def same_origin(request: Request) -> bool:
+    return request.headers.get("origin") == f"{request.url.scheme}://{request.headers.get('host')}"
+
+
+def login_page(message: str = "") -> HTMLResponse:
+    notice = "<p role='alert'>Sign in failed.</p>" if message else ""
+    if not operator_auth.configured():
+        notice = "<p role='alert'>Operator setup required. Run <code>python -m server.admin init</code> on the server, then restart it.</p>"
+    body = f"""<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AetherTerm sign in</title><style>body{{font:16px system-ui;background:#171b20;color:#f1f5f9;margin:0;display:grid;min-height:100vh;place-items:center}}
+main{{width:min(90vw,380px);background:#222a33;padding:2rem;border-radius:12px}}label,input,button{{display:block;width:100%;box-sizing:border-box}}
+input,button{{font:inherit;padding:.8rem;margin:.7rem 0 1rem;border-radius:6px}}button{{background:#6ee7b7;border:0;cursor:pointer}}a{{color:#6ee7b7}}</style>
+<main><h1>AetherTerm</h1><p>Sign in to the operator console.</p>{notice}<form method="post" action="/login">
+<label for="password">Operator password</label><input id="password" name="password" type="password" autocomplete="current-password" required>
+<button type="submit">Sign in</button></form><p>Run only on loopback until remote TLS setup is complete.</p></main></html>"""
+    return HTMLResponse(body, headers={"Cache-Control": "no-store"})
+
+
+@app.middleware("http")
+async def protect_web(request: Request, call_next):
+    if request.url.path.startswith("/web") and not operator_auth.session_key(request.cookies.get(COOKIE_NAME)):
+        return RedirectResponse("/login", status_code=303)
+    response = await call_next(request)
+    if request.url.path.startswith("/web"):
+        response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+@app.get("/login")
+async def show_login(request: Request):
+    if operator_auth.session_key(request.cookies.get(COOKIE_NAME)):
+        return RedirectResponse("/web/", status_code=303)
+    return login_page()
+
+
+@app.post("/login")
+async def sign_in(request: Request):
+    if not same_origin(request):
+        return PlainTextResponse("Forbidden", status_code=403)
+    if not operator_auth.configured():
+        return PlainTextResponse("Operator setup required", status_code=503)
+    client_ip = request.client.host if request.client else "unknown"
+    if not operator_auth.allow_login(client_ip):
+        return PlainTextResponse("Too many attempts", status_code=429)
+    body = await request.body()
+    if len(body) > 4096:
+        return PlainTextResponse("Request too large", status_code=413)
+    password = parse_qs(body.decode("utf-8", errors="replace")).get("password", [""])[0]
+    if not operator_auth.verify_password(password):
+        response = login_page("invalid")
+        response.status_code = 401
+        return response
+    token = operator_auth.create_session()
+    response = RedirectResponse("/web/", status_code=303)
+    response.set_cookie(
+        COOKIE_NAME, token, max_age=SESSION_SECONDS, httponly=True,
+        secure=request.url.scheme == "https", samesite="strict", path="/",
+    )
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+@app.post("/logout")
+async def sign_out(request: Request):
+    if not same_origin(request):
+        return PlainTextResponse("Forbidden", status_code=403)
+    await operator_auth.revoke(request.cookies.get(COOKIE_NAME))
+    response = RedirectResponse("/login", status_code=303)
+    response.delete_cookie(COOKIE_NAME, path="/")
+    return response
+
 @app.websocket("/ws")
 async def web_websocket(websocket: WebSocket):
-    client_ip = websocket.client.host if hasattr(websocket, 'client') else "unknown"
+    client_ip = websocket.client.host if websocket.client else "unknown"
+    expected_origin = f"{'https' if websocket.url.scheme == 'wss' else 'http'}://{websocket.headers.get('host')}"
+    session_key = operator_auth.session_key(websocket.cookies.get(COOKIE_NAME))
+    if websocket.headers.get("origin") != expected_origin or session_key is None:
+        log_security_event("WEB_ACCESS_DENIED", client_ip)
+        await websocket.close(code=1008, reason="Authentication or origin required")
+        return
 
     # Security check: Rate limiting
     if is_rate_limited(client_ip):
@@ -77,11 +159,22 @@ async def web_websocket(websocket: WebSocket):
         return
 
     await websocket.accept()
+    operator_auth.register_socket(session_key, websocket)
     log_security_event("WEB_CONNECTION_ESTABLISHED", client_ip, "Web client connected")
 
     try:
         while True:
-            data = await websocket.receive_text()
+            remaining = operator_auth.seconds_remaining(session_key)
+            if remaining <= 0:
+                await websocket.close(code=1008, reason="Session expired")
+                break
+            try:
+                data = await asyncio.wait_for(websocket.receive_text(), timeout=min(remaining, 1.0))
+            except asyncio.TimeoutError:
+                continue
+            if operator_auth.seconds_remaining(session_key) <= 0:
+                await websocket.close(code=1008, reason="Session expired")
+                break
             msg = json.loads(data)
 
             # Log all web client activities for security monitoring
@@ -103,8 +196,9 @@ async def web_websocket(websocket: WebSocket):
             elif msg['type'] == 'term_input':
                 session_id = msg['sessionId']
                 input_b64 = msg['input']
-                if session_id not in sessions:
-                    log_security_event("INVALID_SESSION", client_ip, f"Session: {session_id}")
+                if session_id not in sessions or sessions[session_id]['web_ws'] is not websocket:
+                    log_security_event("INVALID_SESSION", client_ip)
+                    await websocket.send_text(json.dumps({"type": "error", "message": "Session unavailable"}))
                     continue
                 device_id = sessions[session_id]['device_id']
                 await devices[device_id].send_text(json.dumps({"type": "term_data", "sessionId": session_id, "data": input_b64}))
@@ -112,13 +206,16 @@ async def web_websocket(websocket: WebSocket):
                 session_id = msg['sessionId']
                 cols = msg.get('cols', 80)
                 rows = msg.get('rows', 24)
-                if session_id in sessions:
+                if session_id in sessions and sessions[session_id]['web_ws'] is websocket:
                     device_id = sessions[session_id]['device_id']
                     await devices[device_id].send_text(json.dumps({"type": "resize", "sessionId": session_id, "cols": cols, "rows": rows}))
+                else:
+                    await websocket.send_text(json.dumps({"type": "error", "message": "Session unavailable"}))
     except Exception as e:
         log_security_event("WEB_ERROR", client_ip, str(e))
         print(f"Web WS error: {e}")
     finally:
+        operator_auth.unregister_socket(session_key, websocket)
         log_security_event("WEB_CONNECTION_CLOSED", client_ip, "Web client disconnected")
         # remove sessions for this web_ws
         to_remove = [sid for sid, s in sessions.items() if s['web_ws'] == websocket]
@@ -192,5 +289,6 @@ async def client_websocket(websocket: WebSocket):
         log_security_event("CLIENT_CONNECTION_CLOSED", client_ip, f"Device: {device_id}")
 
 @app.get("/")
-async def root():
-    return HTMLResponse("<h1>AetherTerm Server</h1><a href='/web/'>Web Interface</a>")
+async def root(request: Request):
+    destination = "/web/" if operator_auth.session_key(request.cookies.get(COOKIE_NAME)) else "/login"
+    return RedirectResponse(destination, status_code=303)
