@@ -49,7 +49,8 @@ class BrowserAuthTests(unittest.IsolatedAsyncioTestCase):
         self.server_env = env
         self.server_log = open(Path(self.temp.name) / "server.log", "w+", encoding="utf-8")
         self.server = subprocess.Popen(
-            [sys.executable, "-m", "uvicorn", "server.main:app", "--host", "127.0.0.1", "--port", str(self.port)],
+            [sys.executable, "-m", "uvicorn", "server.main:app", "--host", "127.0.0.1", "--port", str(self.port),
+             "--ws-max-size", "65536"],
             cwd=ROOT, env=env, stdout=self.server_log, stderr=subprocess.STDOUT, start_new_session=True,
         )
         for _ in range(150):
@@ -119,6 +120,8 @@ class BrowserAuthTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(status, 403)
         status, _ = self.request("POST", "/login", "password=wrong", {"Origin": origin})
         self.assertEqual(status, 401)
+        status, _ = self.request("POST", "/login", "password=" + "x" * 4096, {"Origin": origin})
+        self.assertEqual(status, 413)
         status, headers = self.request("POST", "/login", "password=a-test-password-only", {"Origin": origin})
         self.assertEqual(status, 303)
         cookie = headers["set-cookie"].split(";", 1)[0]
@@ -294,6 +297,12 @@ class BrowserAuthTests(unittest.IsolatedAsyncioTestCase):
                 await agent.send(json.dumps({"type": "term_data", "sessionId": sessions[0],
                                              "data": base64.b64encode(b"still works").decode()}))
                 self.assertEqual(base64.b64decode(json.loads(await browser.recv())["data"]), b"still works")
+                async with connect(browser_uri, origin=origin, additional_headers={"Cookie": cookie}) as oversized:
+                    await oversized.send("x" * 65537)
+                    with self.assertRaises(ConnectionClosed):
+                        await asyncio.wait_for(oversized.recv(), 2)
+                await browser.send(json.dumps({"type": "list_devices"}))
+                self.assertEqual(json.loads(await browser.recv())["devices"], ["test-agent"])
 
     async def test_real_agent_sessions_are_isolated_and_closed(self):
         agent, agent_log = self.start_real_agent()
@@ -468,7 +477,8 @@ class BrowserAuthTests(unittest.IsolatedAsyncioTestCase):
                     self.fail("Old shell survived server shutdown")
 
             self.server = subprocess.Popen(
-                [sys.executable, "-m", "uvicorn", "server.main:app", "--host", "127.0.0.1", "--port", str(self.port)],
+                [sys.executable, "-m", "uvicorn", "server.main:app", "--host", "127.0.0.1", "--port", str(self.port),
+                 "--ws-max-size", "65536"],
                 cwd=ROOT, env=self.server_env, stdout=self.server_log, stderr=subprocess.STDOUT, start_new_session=True,
             )
             for _ in range(100):

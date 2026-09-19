@@ -22,7 +22,7 @@ Start the backend with a single worker (live device/session state is still proce
 
 ```bash
 python -m uvicorn server.main:app --host 127.0.0.1 --port 8001 \
-  --proxy-headers --forwarded-allow-ips 127.0.0.1
+  --proxy-headers --forwarded-allow-ips 127.0.0.1 --ws-max-size 65536
 ```
 
 After securely copying its newly enrolled credential file to the agent machine with owner-only permissions, connect it to the public TLS endpoint:

@@ -4,6 +4,8 @@ import argparse
 
 import uvicorn
 
+from .limits import MAX_FRAME_BYTES
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run the AetherTerm server on loopback")
@@ -12,7 +14,8 @@ def main() -> None:
     if not 1 <= args.port <= 65535:
         parser.error("Port must be between 1 and 65535")
     uvicorn.run("server.main:app", host="127.0.0.1", port=args.port,
-                proxy_headers=True, forwarded_allow_ips="127.0.0.1", workers=1)
+                proxy_headers=True, forwarded_allow_ips="127.0.0.1", workers=1,
+                ws_max_size=MAX_FRAME_BYTES)
 
 
 if __name__ == "__main__":

@@ -177,9 +177,11 @@ async def sign_in(request: Request):
     client_ip = request.client.host if request.client else "unknown"
     if not state.operator_auth.allow_login(client_ip):
         return PlainTextResponse("Too many attempts", status_code=429)
-    body = await request.body()
-    if len(body) > 4096:
-        return PlainTextResponse("Request too large", status_code=413)
+    body = bytearray()
+    async for chunk in request.stream():
+        if len(body) + len(chunk) > 4096:
+            return PlainTextResponse("Request too large", status_code=413)
+        body.extend(chunk)
     password = parse_qs(body.decode("utf-8", errors="replace")).get("password", [""])[0]
     if not state.operator_auth.verify_password(password):
         response = login_page(state, "invalid")

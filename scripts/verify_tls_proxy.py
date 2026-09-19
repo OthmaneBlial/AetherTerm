@@ -149,7 +149,8 @@ def main() -> None:
 
         try:
             backend = start([sys.executable, "-m", "uvicorn", "server.main:app", "--host", "127.0.0.1", "--port",
-                             str(backend_port), "--proxy-headers", "--forwarded-allow-ips", "127.0.0.1"], "backend")
+                             str(backend_port), "--proxy-headers", "--forwarded-allow-ips", "127.0.0.1",
+                             "--ws-max-size", "65536"], "backend")
             wait_for_backend(backend_port, backend)
             proxy = start([str(args.caddy), "run", "--config", str(config), "--adapter", "caddyfile"], "proxy")
             context = ssl.create_default_context(cafile=str(cert))
