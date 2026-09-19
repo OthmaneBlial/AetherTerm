@@ -305,6 +305,72 @@ class BrowserAuthTests(unittest.IsolatedAsyncioTestCase):
                 await browser.send(json.dumps({"type": "list_devices"}))
                 self.assertEqual(json.loads(await browser.recv())["devices"], ["test-agent"])
 
+    async def test_slow_browser_output_does_not_block_another_browser(self):
+        origin = f"http://127.0.0.1:{self.port}"
+        status, headers = self.request("POST", "/login", "password=a-test-password-only", {"Origin": origin})
+        self.assertEqual(status, 303)
+        cookie = headers["set-cookie"].split(";", 1)[0]
+        browser_uri = f"ws://127.0.0.1:{self.port}/ws"
+        agent_uri = f"ws://127.0.0.1:{self.port}/client"
+        rss_file = Path(f"/proc/{self.server.pid}/status")
+        stat_file = Path(f"/proc/{self.server.pid}/stat")
+
+        def rss_bytes():
+            if not rss_file.is_file():
+                return None
+            match = re.search(r"^VmRSS:\s+(\d+) kB", rss_file.read_text(), re.MULTILINE)
+            return int(match.group(1)) * 1024 if match else None
+
+        def cpu_seconds():
+            if not stat_file.is_file():
+                return None
+            fields = stat_file.read_text().rsplit(")", 1)[1].split()
+            return (int(fields[11]) + int(fields[12])) / os.sysconf("SC_CLK_TCK")
+
+        async with connect(agent_uri) as agent:
+            await agent.send(json.dumps({"type": "register", "deviceId": "test-agent", "token": self.agent_token}))
+            self.assertEqual(json.loads(await agent.recv())["type"], "registered")
+            async with connect(browser_uri, origin=origin, additional_headers={"Cookie": cookie},
+                               max_queue=1, close_timeout=1) as slow, \
+                       connect(browser_uri, origin=origin, additional_headers={"Cookie": cookie}) as healthy:
+                await slow.send(json.dumps({"type": "start_session", "deviceId": "test-agent"}))
+                session_id = json.loads(await slow.recv())["sessionId"]
+                self.assertEqual(json.loads(await agent.recv())["sessionId"], session_id)
+                await agent.send(json.dumps({"type": "session_ready", "sessionId": session_id}))
+                self.assertEqual(json.loads(await slow.recv())["type"], "session_ready")
+                baseline_rss = rss_bytes()
+                baseline_cpu = cpu_seconds()
+                peak_rss = baseline_rss or 0
+                data = base64.b64encode(b"x" * 8192).decode()
+                worst_healthy_delay = 0.0
+                for index in range(200):
+                    await asyncio.wait_for(agent.send(json.dumps({"type": "term_data", "sessionId": session_id,
+                                                                   "data": data})), 2)
+                    if index % 25 == 0:
+                        started = time.monotonic()
+                        await healthy.send(json.dumps({"type": "list_devices"}))
+                        listing = json.loads(await asyncio.wait_for(healthy.recv(), 2))
+                        self.assertEqual(listing["devices"], ["test-agent"])
+                        worst_healthy_delay = max(worst_healthy_delay, time.monotonic() - started)
+                    current_rss = rss_bytes()
+                    if current_rss is not None:
+                        peak_rss = max(peak_rss, current_rss)
+                    await asyncio.sleep(0.01)
+                self.assertLess(worst_healthy_delay, 2)
+                if baseline_rss is not None:
+                    self.assertLess(peak_rss - baseline_rss, 128 * 1024 * 1024)
+                after_cpu = cpu_seconds()
+                if baseline_cpu is not None and after_cpu is not None:
+                    self.assertLess(after_cpu - baseline_cpu, 8)
+                await slow.close()
+                closed = json.loads(await asyncio.wait_for(agent.recv(), 5))
+                self.assertEqual(closed, {"type": "close_session", "sessionId": session_id})
+                print(f"Slow browser burst: 1.6 MiB relayed; sibling latency <= {worst_healthy_delay:.2f}s; "
+                      f"server RSS growth {((peak_rss - baseline_rss) / 1048576):.1f} MiB; "
+                      f"CPU {after_cpu - baseline_cpu:.2f}s" if baseline_rss is not None and baseline_cpu is not None
+                      and after_cpu is not None else
+                      f"Slow browser burst: 1.6 MiB relayed; sibling latency <= {worst_healthy_delay:.2f}s")
+
     async def test_real_agent_sessions_are_isolated_and_closed(self):
         agent, agent_log = self.start_real_agent()
         origin = f"http://127.0.0.1:{self.port}"
