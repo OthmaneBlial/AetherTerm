@@ -2,7 +2,7 @@
 
 An early prototype that relays a shell on an agent machine to a browser through a FastAPI WebSocket server. It is **not ready for network deployment**.
 
-> **Security warning:** operator sign-in and per-device agent credentials are implemented, but the current transport is plain `ws://`. Keep the server bound to loopback while the [security roadmap](ROADMAP.md) is implemented. Do not use this revision for production administration or expose it to a LAN or the Internet.
+> **Security warning:** operator sign-in and per-device agent credentials are implemented. The documented local run uses plain `ws://`; a TLS option has only been checked locally with a temporary certificate. Keep the server bound to loopback while the [security roadmap](ROADMAP.md) is implemented. Do not use this revision for production administration or expose it to a LAN or the Internet.
 
 ## What exists today
 
@@ -40,7 +40,7 @@ source .venv/bin/activate
 python client/main.py --host 127.0.0.1 --port 8001 --device-id local-agent --token-file ~/.config/aetherterm/local-agent.token
 ```
 
-Open `http://127.0.0.1:8001/web/` and sign in. Use `python -m server.admin rotate local-agent --output <new-private-file>` to replace a device credential, or `python -m server.admin revoke local-agent` to disable it. These commands change the server registry; restart the agent with the new file after rotation. Do not put credential files in Git or pass their contents through command arguments.
+Open `http://127.0.0.1:8001/web/` and sign in. Use `python -m server.admin rotate local-agent --output <new-private-file>` to replace a device credential, or `python -m server.admin revoke local-agent` to disable it. These commands change the server registry; restart the agent with the new file after rotation. Do not put credential files in Git or pass their contents through command arguments. The proposed remote TLS topology and its current evidence are in [the deployment guide](docs/DEPLOYMENT.md).
 
 ## Intended product
 
@@ -55,7 +55,7 @@ AetherTerm does not speak SSH. Compatibility, security and ease-of-use compariso
 | Shell relay | Local server/agent WebSocket round trip was exercised during the roadmap audit. | Independent PTYs, cleanup, full terminal interactions and Linux validation. |
 | Browser access | Password login, cookie session, same-origin WebSocket and negative cross-browser integration test. | Full device authorization, expiry/revocation and deployment validation. |
 | Agent identity | Per-device credential-file enrollment, rotation and revocation tested locally. | Remote encrypted transport, Linux installation and operating guidance. |
-| Transport | Plain `ws://` in agent and page. | Loopback-only plain mode and verified WSS for remote mode. |
+| Transport | Remote cleartext refused in code; direct TLS and a local Caddy HTTPS/WSS proxy test with certificate validation passed. | Public certificate, external network and graphical browser validation. |
 | Packaging and automation | Requirements files and local `unittest` integration tests; no CI or release artifacts in this checkout. | Reproducible installs, automated gates and tested downloads. |
 
 The MIT license is in [LICENSE](LICENSE). Contributions are welcome once the security and test setup are documented; please avoid deploying this revision to a reachable network. The complete sequence is tracked in [ROADMAP.md](ROADMAP.md).

@@ -8,6 +8,7 @@ from urllib.parse import parse_qs
 
 from .agents import AgentRegistry, agents_file
 from .auth import COOKIE_NAME, SESSION_SECONDS, OperatorAuth, operator_file
+from .network import transport_allowed
 
 app = FastAPI()
 operator_auth = OperatorAuth(operator_file())
@@ -87,6 +88,8 @@ input,button{{font:inherit;padding:.8rem;margin:.7rem 0 1rem;border-radius:6px}}
 
 @app.middleware("http")
 async def protect_web(request: Request, call_next):
+    if not transport_allowed(request.url.scheme, request.client.host if request.client else "unknown"):
+        return PlainTextResponse("HTTPS required for remote access", status_code=403)
     if request.url.path.startswith("/web") and not operator_auth.session_key(request.cookies.get(COOKIE_NAME)):
         return RedirectResponse("/login", status_code=303)
     response = await call_next(request)
@@ -141,6 +144,9 @@ async def sign_out(request: Request):
 @app.websocket("/ws")
 async def web_websocket(websocket: WebSocket):
     client_ip = websocket.client.host if websocket.client else "unknown"
+    if not transport_allowed(websocket.url.scheme, client_ip):
+        await websocket.close(code=1008, reason="WSS required for remote access")
+        return
     expected_origin = f"{'https' if websocket.url.scheme == 'wss' else 'http'}://{websocket.headers.get('host')}"
     session_key = operator_auth.session_key(websocket.cookies.get(COOKIE_NAME))
     if websocket.headers.get("origin") != expected_origin or session_key is None:
@@ -221,6 +227,9 @@ async def web_websocket(websocket: WebSocket):
 @app.websocket("/client")
 async def client_websocket(websocket: WebSocket):
     client_ip = websocket.client.host if websocket.client else "unknown"
+    if not transport_allowed(websocket.url.scheme, client_ip):
+        await websocket.close(code=1008, reason="WSS required for remote access")
+        return
 
     # Security check: Rate limiting for client connections too
     if is_rate_limited(client_ip):

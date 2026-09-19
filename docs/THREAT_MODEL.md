@@ -1,6 +1,6 @@
 # Threat model and access contract
 
-Status: target for v1 implementation. Browser sign-in, WebSocket ownership and device-bound agent credentials now have local integration tests. The prototype still uses cleartext `ws://`; it is unsafe to expose beyond loopback.
+Status: target for v1 implementation. Browser sign-in, WebSocket ownership and device-bound agent credentials have local integration tests. Remote cleartext is rejected in code and direct HTTPS/WSS has a local test, but a trusted-proxy deployment and external network path remain unverified. Keep the current prototype on loopback.
 
 ## Assets and trust boundaries
 
