@@ -56,6 +56,11 @@ jobs:
           systemd-analyze verify packaging/aetherterm-agent@.service
       - name: Build wheel and source archive
         run: python -m build --wheel --sdist
+      - name: Check source archive contains dependency locks
+        run: |
+          for lock in requirements.lock requirements-runtime.lock requirements-freeze.lock; do
+            tar -tzf dist/*.tar.gz | rg -F -q "/$lock"
+          done
       - name: Check installed wheel outside checkout
         run: |
           python -m venv "$RUNNER_TEMP/aetherterm-wheel"
