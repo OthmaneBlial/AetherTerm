@@ -117,9 +117,10 @@ jobs:
         run: |
           test "$(uname -m)" = x86_64
           pyinstaller --onefile --clean --noconfirm --name aetherterm-agent \
+            --paths "$GITHUB_WORKSPACE" \
             --specpath "$RUNNER_TEMP/aetherterm-pyi-spec" \
             --workpath "$RUNNER_TEMP/aetherterm-pyi-build" \
-            --distpath artifacts/bin client/main.py
+            --distpath artifacts/bin scripts/frozen_agent.py
           agent_version=$(python -c 'import importlib.metadata; print(importlib.metadata.version("aetherterm"))')
           mv artifacts/bin/aetherterm-agent "artifacts/bin/aetherterm-agent-${agent_version}-linux-x86_64"
           file "artifacts/bin/aetherterm-agent-${agent_version}-linux-x86_64"
