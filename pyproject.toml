@@ -26,6 +26,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["build==1.6.1", "mypy==2.3.1", "ruff==0.16.7"]
+freeze = ["build==1.6.1", "pyinstaller==6.22.3"]
 
 [project.scripts]
 aetherterm-admin = "server.admin:main"

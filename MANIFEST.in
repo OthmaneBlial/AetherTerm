@@ -1,5 +1,5 @@
 include LICENSE README.md
-include requirements.lock requirements-runtime.lock
+include requirements.lock requirements-runtime.lock requirements-freeze.lock
 include web/package.json web/package-lock.json
 recursive-include web/src *.js *.css
 recursive-include web/assets *
