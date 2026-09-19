@@ -118,31 +118,16 @@ async def main():
                     await page.keyboard.type("printf 'BROWSER_RETURNED\\n'")
                     await page.keyboard.press("Enter")
                     await page.get_by_text("BROWSER_RETURNED", exact=True).wait_for(state="attached", timeout=10000)
-                    await page.keyboard.type("cat")
+                    await page.keyboard.type("cd /tmp")
                     await page.keyboard.press("Enter")
-                    await page.get_by_text("cat", exact=False).wait_for(state="attached", timeout=10000)
-                    await asyncio.sleep(0.2)
-                    await page.get_by_role("button", name="Send Ctrl+C").click()
-                    await expect(page.get_by_text("Sent Ctrl+C to the active shell.")).to_be_visible()
-                    await page.keyboard.type("printf 'AFTER_CTRL_C\\n'")
-                    await page.keyboard.press("Enter")
-                    await page.get_by_text("AFTER_CTRL_C", exact=True).wait_for(state="attached", timeout=10000)
-                    await page.keyboard.type("printf 'Caf\\303\\251 \\346\\274\\242\\345\\255\\227\\n'")
-                    await page.keyboard.press("Enter")
-                    try:
-                        await page.get_by_text("Café 漢字", exact=True).wait_for(state="attached", timeout=10000)
-                    except Exception:
-                        print("Unicode terminal rows:", repr(await page.locator(".xterm-rows").inner_text()),
-                              file=sys.stderr)
-                        diagnostic_dir = Path(os.environ.get("AETHERTERM_SCREENSHOT_DIR", directory / "screenshots"))
-                        diagnostic_dir.mkdir(parents=True, exist_ok=True)
-                        await page.screenshot(path=str(diagnostic_dir / "unicode-failure.png"), full_page=True)
-                        raise
                     await page.keyboard.type("clear")
                     await page.keyboard.press("Enter")
-                    await page.keyboard.type("printf 'AETHERTERM_READY\\n'; uname -s; printf 'SHELL_RESPONDS\\n'")
+                    await page.keyboard.type("printf 'Live shell connected\\n'")
                     await page.keyboard.press("Enter")
-                    await page.get_by_text("SHELL_RESPONDS", exact=True).wait_for(state="attached", timeout=10000)
+                    await page.get_by_text("Live shell connected", exact=True).wait_for(state="attached", timeout=10000)
+                    await page.keyboard.type("uname -s")
+                    await page.keyboard.press("Enter")
+                    await page.get_by_text("Linux", exact=True).wait_for(state="attached", timeout=10000)
                     errors.clear()  # Network errors from the deliberate outage are expected.
                     screenshot_dir = os.environ.get("AETHERTERM_SCREENSHOT_DIR")
                     if screenshot_dir:
@@ -166,6 +151,28 @@ async def main():
                         raise AssertionError(f"Mobile horizontal overflow: {widths}")
                     if screenshot_dir:
                         await page.screenshot(path=str(screenshots / "mobile.png"), full_page=True)
+                    await page.set_viewport_size({"width": 1280, "height": 800})
+                    await page.locator(".xterm-helper-textarea").focus()
+                    await page.keyboard.type("cat")
+                    await page.keyboard.press("Enter")
+                    await page.get_by_text("cat", exact=False).wait_for(state="attached", timeout=10000)
+                    await asyncio.sleep(0.2)
+                    await page.get_by_role("button", name="Send Ctrl+C").click()
+                    await expect(page.get_by_text("Sent Ctrl+C to the active shell.")).to_be_visible()
+                    await page.keyboard.type("printf 'AFTER_CTRL_C\\n'")
+                    await page.keyboard.press("Enter")
+                    await page.get_by_text("AFTER_CTRL_C", exact=True).wait_for(state="attached", timeout=10000)
+                    await page.keyboard.type("printf 'Caf\\303\\251 \\346\\274\\242\\345\\255\\227\\n'")
+                    await page.keyboard.press("Enter")
+                    try:
+                        await page.get_by_text("Café 漢字", exact=True).wait_for(state="attached", timeout=10000)
+                    except Exception:
+                        print("Unicode terminal rows:", repr(await page.locator(".xterm-rows").inner_text()),
+                              file=sys.stderr)
+                        diagnostic_dir = Path(os.environ.get("AETHERTERM_SCREENSHOT_DIR", directory / "screenshots"))
+                        diagnostic_dir.mkdir(parents=True, exist_ok=True)
+                        await page.screenshot(path=str(diagnostic_dir / "unicode-failure.png"), full_page=True)
+                        raise
                     await expect(page.get_by_role("button", name="Close session")).to_be_visible()
                     await page.get_by_role("button", name="Close session").click()
                     await expect(page.get_by_role("heading", name="Your next shell starts here.")).to_be_visible()
