@@ -118,6 +118,15 @@ async def main():
                     await page.keyboard.type("printf 'BROWSER_RETURNED\\n'")
                     await page.keyboard.press("Enter")
                     await page.get_by_text("BROWSER_RETURNED", exact=True).wait_for(state="attached", timeout=10000)
+                    await page.keyboard.type("cat")
+                    await page.keyboard.press("Enter")
+                    await page.keyboard.insert_text("Café 漢字")
+                    await page.keyboard.press("Enter")
+                    await page.get_by_text("Café 漢字", exact=False).wait_for(state="attached", timeout=10000)
+                    await page.keyboard.press("Control+C")
+                    await page.keyboard.type("printf 'AFTER_CTRL_C\\n'")
+                    await page.keyboard.press("Enter")
+                    await page.get_by_text("AFTER_CTRL_C", exact=True).wait_for(state="attached", timeout=10000)
                     errors.clear()  # Network errors from the deliberate outage are expected.
                     await page.set_viewport_size({"width": 375, "height": 812})
                     for _ in range(50):
@@ -155,7 +164,7 @@ async def main():
                 stop(server)
                 server_log.close()
                 agent_log.close()
-    print("Chromium login, real PTY, server restart, reauthentication, mobile layout and sign-out: PASS")
+    print("Chromium login, PTY, restart, reauthentication, Unicode paste, Ctrl+C, mobile layout and sign-out: PASS")
 
 
 if __name__ == "__main__":
