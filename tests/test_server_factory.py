@@ -1,15 +1,23 @@
 """Multiple app instances must not share shell or authentication state."""
 
+import asyncio
 from pathlib import Path
 from contextlib import redirect_stdout
 from io import StringIO
 import json
 import os
+import socket
 import tempfile
+import time
 import unittest
 
-from server.auth import MAX_OPERATOR_SESSIONS, OperatorAuth, initialize_operator
+import uvicorn
+import websockets
+from websockets.exceptions import ConnectionClosed
+
+from server.auth import COOKIE_NAME, MAX_OPERATOR_SESSIONS, OperatorAuth, initialize_operator
 from server.main import create_app, log_security_event
+from server.protocol import WEBSOCKET_SUBPROTOCOL
 
 
 class ServerFactoryTests(unittest.TestCase):
@@ -69,6 +77,45 @@ class ServerFactoryTests(unittest.TestCase):
             first_state.device_last_seen["first-only"] = 1.0
             self.assertEqual(second_state.device_last_seen, {})
             self.assertIsNot(first_state.browser_connections, second_state.browser_connections)
+
+
+class LiveSessionExpiryTests(unittest.IsolatedAsyncioTestCase):
+    async def test_expired_operator_session_closes_active_websocket(self):
+        with tempfile.TemporaryDirectory(prefix="aetherterm-expiry-") as directory:
+            root = Path(directory)
+            operator_path = root / "operator.json"
+            initialize_operator(operator_path, "expiry-test-password")
+            application = create_app(operator_path=operator_path, agents_path=root / "agents.json")
+            auth = application.state.runtime.operator_auth
+            token = auth.create_session()
+            key = auth.session_key(token)
+            self.assertIsNotNone(key)
+            with socket.socket() as listener:
+                listener.bind(("127.0.0.1", 0))
+                port = listener.getsockname()[1]
+            server = uvicorn.Server(uvicorn.Config(application, host="127.0.0.1", port=port,
+                                                  ws_max_size=65536, log_level="critical"))
+            task = asyncio.create_task(server.serve())
+            try:
+                for _ in range(100):
+                    if server.started:
+                        break
+                    await asyncio.sleep(0.05)
+                else:
+                    self.fail("Expiry test server did not start")
+                origin = f"http://127.0.0.1:{port}"
+                async with websockets.connect(f"ws://127.0.0.1:{port}/ws", origin=origin,
+                                              additional_headers={"Cookie": f"{COOKIE_NAME}={token}"},
+                                              subprotocols=[WEBSOCKET_SUBPROTOCOL]) as browser:
+                    await browser.send(json.dumps({"type": "list_devices"}))
+                    self.assertEqual(json.loads(await browser.recv())["type"], "device_list")
+                    auth.sessions[key] = time.monotonic() - 1
+                    with self.assertRaises(ConnectionClosed) as closed:
+                        await asyncio.wait_for(browser.recv(), 2)
+                    self.assertEqual(closed.exception.rcvd.code, 1008)
+            finally:
+                server.should_exit = True
+                await asyncio.wait_for(task, 5)
 
 
 if __name__ == "__main__":
