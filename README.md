@@ -18,11 +18,13 @@ These are real browser captures from the [Ubuntu CI run for `dbaf5e9`](https://g
 - Device-bound agent credentials stored in owner-readable files, with server-side rotation and revocation.
 - Agent reconnection attempts after connection failures, plus isolated PTYs for simultaneous local sessions. Existing shells close after disconnection; a returning agent needs a new session.
 
-The browser terminal uses locally bundled xterm.js. Unicode paste, ANSI colors, `less`, the Ctrl+C toolbar action and resize have been exercised on macOS in Chrome. The Linux Chromium CI journey also checks shell output, Unicode rendering and the Ctrl+C action; `vim`, arrow keys and real touch input still need validation. The page derives its WebSocket URL from the page origin, but remote HTTPS/WSS deployment has not been validated outside a local proxy test. Operator and agent credentials are created outside the repository; no working defaults are shipped.
+The browser terminal uses locally bundled xterm.js. Unicode paste, ANSI colors, `less`, the Ctrl+C toolbar action and resize have been exercised on macOS in Chrome. The Linux Chromium CI journey also checks shell output, Unicode rendering, the Ctrl+C action and Bash history with ArrowUp; `vim` and real touch input still need validation. The page derives its WebSocket URL from the page origin, but remote HTTPS/WSS deployment has not been validated outside a local proxy test. Operator and agent credentials are created outside the repository; no working defaults are shipped.
 
 ## Loopback-only development run
 
 The [local quickstart](docs/QUICKSTART.md) includes the full first-shell sequence, a second identity, rotation and shutdown.
+
+For a disposable first look after creating a Python 3.13 venv and running `python -m pip install .`, use `python -m scripts.demo_local` from this checkout. It starts a real loopback server and agent, prints a temporary sign-in password, and removes the identities when you press Ctrl+C. The persistent setup below keeps its identities for later sessions.
 
 This flow was exercised on macOS with Python 3.13. It is a local prototype run, not a supported release or a Linux compatibility claim. From the project root:
 

@@ -17,6 +17,8 @@ python -m pip check
 
 The three entry points are `aetherterm-admin`, `aetherterm-server` and `aetherterm-agent`. The CI installs the built wheel in a **separate clean virtual environment outside the checkout** and completes an authenticated server–agent–PTY round trip. The wheel requires Python; the separate Linux agent binary is described below. The version and filename here must be updated when the package version changes.
 
+The `python-distributions` artifact in [run 35447341504](https://github.com/OthmaneBlial/AetherTerm/actions/runs/35447341504) contains the wheel, source archive and `SHA256SUMS`, retained for seven days. That artifact was downloaded to a separate temporary directory on macOS, both checksums matched, and the downloaded wheel was installed into a fresh Python 3.13 venv outside the checkout. `pip check` and an authenticated server–agent–real-PTY round trip passed. This verifies that particular CI download, not a permanent public release asset.
+
 ## Linux x86_64 agent binary in CI
 
 The [`linux-agent-binary` CI job](../.github/workflows/ci.yml) also builds a PyInstaller one-file agent named `aetherterm-agent-0.1.0a0-linux-x86_64`. The job checks its command-line startup and SHA-256 manifest, then uses **that binary** to open a real Linux PTY through a server installed from the wheel. This passed on Ubuntu 24.04 in [run 35446843613](https://github.com/OthmaneBlial/AetherTerm/actions/runs/35446843613).
