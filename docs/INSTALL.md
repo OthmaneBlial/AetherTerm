@@ -2,7 +2,7 @@
 
 There is **no verified public release download** yet. The commands below build from this checkout. Only Python 3.13 is declared; the real PTY integration runs on Ubuntu 24.04 CI and macOS development. Follow the [local quickstart](QUICKSTART.md) for identity setup and first use.
 
-On 2026-09-19, a fresh shallow clone of `main` at commit `51210b2` was installed in a new macOS Python 3.13 environment with the hashed runtime lock. The installed package passed the documentation-link check and `python -m scripts.demo_local --check`, including disposable server and agent startup/cleanup. This is macOS onboarding evidence; it does not replace the pending human-led Linux installation review.
+On 2026-09-19, a fresh shallow clone of `main` at commit `06939e7` was installed in a new macOS Python 3.13 environment with the hashed runtime lock. The installed package passed the documentation-link check and `python -m scripts.demo_local --check`, including disposable server and agent startup/cleanup. The matching CI run [35451933231](https://github.com/OthmaneBlial/AetherTerm/actions/runs/35451933231) passed all eight required jobs. This is macOS onboarding evidence; it does not replace the pending human-led Linux installation review.
 
 ## Python wheel
 
