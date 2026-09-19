@@ -1,0 +1,25 @@
+name: Feature request
+description: Describe a concrete use case and its constraints
+title: "feature: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Task you need to complete
+      description: Describe the real workflow and where AetherTerm currently stops you.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Include deployment, security or platform constraints that matter.
+    validations:
+      required: false
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Current workaround or alternative
+    validations:
+      required: false
