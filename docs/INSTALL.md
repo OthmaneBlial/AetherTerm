@@ -1,0 +1,44 @@
+# Installation paths currently under test
+
+There is **no verified public release download** yet. The commands below build from this checkout. Only Python 3.13 is declared; the real PTY integration runs on Ubuntu 24.04 CI and macOS development. Follow the [local quickstart](QUICKSTART.md) for identity setup and first use.
+
+## Python wheel
+
+The checked-in Web bundle is included in the Python wheel. From a checkout:
+
+```bash
+python3.13 -m venv .venv
+source .venv/bin/activate
+python -m pip install build
+python -m build --wheel --sdist
+python -m pip install dist/aetherterm-0.1.0a0-py3-none-any.whl
+python -m pip check
+```
+
+The three entry points are `aetherterm-admin`, `aetherterm-server` and `aetherterm-agent`. The CI installs the built wheel in a **separate clean virtual environment outside the checkout** and completes an authenticated server–agent–PTY round trip. This is an installable Python package, not an autonomous binary. The version and filename here must be updated when the package version changes.
+
+## Linux server container
+
+The repository's [Dockerfile](../Dockerfile) builds a server image from the wheel. The image runs as UID 10001, stores operator and device files under `/data`, and keeps the server bound to `127.0.0.1` through the installed entry point. The Linux CI container smoke test starts the image with host networking, a read-only root filesystem and a bind-mounted state directory, then connects a host agent and runs a real PTY command. This establishes that topology on the runner only; it is not evidence of a public HTTPS deployment.
+
+For a **controlled same-host Linux test**, build the image and prepare a private state directory owned by the container UID:
+
+```bash
+docker build --tag aetherterm:local .
+install -d -m 700 "$HOME/.local/share/aetherterm-server"
+sudo chown 10001:10001 "$HOME/.local/share/aetherterm-server"
+```
+
+Run `aetherterm-admin init` and `enroll` inside the image with the same `/data` mount. Use `docker run -it --rm --network host --mount type=bind,src="$HOME/.local/share/aetherterm-server",dst=/data --entrypoint aetherterm-admin aetherterm:local init`, then repeat with `enroll DEVICE_ID --output /data/DEVICE_ID.token`. The `init` command needs an interactive terminal for password entry. Transfer the resulting token file to the intended agent through a trusted channel, preserve mode `0600` and ownership by the agent account, then remove any extra server-side copy only when you have verified the agent has its copy. The server registry retains only its digest.
+
+Start the server container with the same mount:
+
+```bash
+docker run --rm --network host --read-only \
+  --tmpfs /tmp:rw,nosuid,nodev,size=16m --cap-drop ALL \
+  --security-opt no-new-privileges \
+  --mount type=bind,src="$HOME/.local/share/aetherterm-server",dst=/data \
+  aetherterm:local --port 8001
+```
+
+Linux host networking is intentional here: the server still listens **only** on host loopback. Do not publish a Docker port or change the bind address to expose an unaudited plain WebSocket service. A trusted same-host TLS proxy remains necessary for remote browser or agent access, and the [remote deployment gate](DEPLOYMENT.md) is not complete. The bind mount is the only durable container state; stop the container to invalidate in-memory browser sessions and close active shells.

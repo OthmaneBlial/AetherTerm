@@ -48,6 +48,8 @@ Open `http://127.0.0.1:8001/web/` and sign in. Use `aetherterm-admin rotate loca
 
 The terminal UI is bundled locally; no CDN connection is needed. To rebuild it after changing `web/src/`, run `cd web && npm ci && npm run build`. The checked-in `web/assets/` files let the Python quickstart work without Node. xterm.js and its fit addon are MIT licensed; their notices are in `web/licenses/`.
 
+The [installation guide](docs/INSTALL.md) describes the wheel and the Linux server container currently exercised in CI. Neither is a published release download yet.
+
 The agent reconnects automatically after a temporary server outage with bounded backoff. Existing shells close when either side disconnects; open a new session after reconnection. An invalid agent credential or rejected WSS certificate stops the agent so the operator can correct the configuration.
 
 ## Intended product
