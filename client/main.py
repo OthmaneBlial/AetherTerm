@@ -4,6 +4,7 @@ import json
 import argparse
 import os
 import base64
+import errno
 from pathlib import Path
 import stat
 import ipaddress
@@ -20,12 +21,20 @@ else:
 
 def read_token_file(path: Path) -> str:
     path = path.expanduser()
-    if path.is_symlink():
-        raise ValueError("Token file must not be a symbolic link")
-    info = path.stat()
-    if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or info.st_mode & 0o077:
-        raise ValueError("Token file must be a private regular file owned by this user (mode 0600)")
-    token = path.read_text(encoding="utf-8").strip()
+    try:
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+    except OSError as exc:
+        if exc.errno == errno.ELOOP:
+            raise ValueError("Token file must not be a symbolic link") from exc
+        raise
+    with os.fdopen(fd, "rb") as source:
+        info = os.fstat(source.fileno())
+        if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or info.st_mode & 0o077:
+            raise ValueError("Token file must be a private regular file owned by this user (mode 0600)")
+        raw = source.read(257)
+        if len(raw) > 256:
+            raise ValueError("Token file is too large")
+    token = raw.decode("utf-8").strip()
     if not token or len(token) > 256 or any(character.isspace() for character in token):
         raise ValueError("Token file contains an invalid credential")
     return token

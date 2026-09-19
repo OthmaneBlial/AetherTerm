@@ -43,6 +43,11 @@ class AgentCredentialTests(unittest.TestCase):
             symlink.symlink_to(original_file)
             with self.assertRaises(ValueError):
                 read_token_file(symlink)
+            oversized = base / "oversized.token"
+            oversized.write_bytes(b"x" * 257)
+            os.chmod(oversized, 0o600)
+            with self.assertRaises(ValueError):
+                read_token_file(oversized)
 
             rotated_file = base / "rotated.token"
             issue_credential(registry_path, "linux-one", rotated_file, rotate=True)
